@@ -1,5 +1,7 @@
--- Universal Aimbot Loader
+-- Test Universal Aimbot Loader
 -- Created by Nullinject
+
+print("=== LOADER STARTING ===")
 
 -- Configuration
 local config = {
@@ -14,12 +16,56 @@ print("Created by " .. config.username)
 print("Version: " .. config.version)
 print("Loading script...")
 
+-- Simple test to ensure we can create GUI
+local function testGUI()
+    print("=== TESTING GUI CREATION ===")
+    
+    -- Check if we're in a game
+    if not game then
+        print("ERROR: Not in Roblox game environment!")
+        return false
+    end
+    
+    -- Check if Players service exists
+    if not game:GetService("Players") then
+        print("ERROR: Players service not found!")
+        return false
+    end
+    
+    -- Check if LocalPlayer exists
+    local player = game:GetService("Players").LocalPlayer
+    if not player then
+        print("ERROR: LocalPlayer not found!")
+        return false
+    end
+    
+    print("Player found: " .. (player.Name or "Unknown"))
+    
+    -- Check if PlayerGui exists
+    local playerGui = player:FindFirstChild("PlayerGui")
+    if not playerGui then
+        print("ERROR: PlayerGui not found!")
+        return false
+    end
+    
+    print("PlayerGui found successfully!")
+    return true
+end
+
 -- Create loading GUI
 local function createLoadingGUI()
+    print("=== CREATING LOADING GUI ===")
+    
+    if not testGUI() then
+        print("GUI test failed - aborting")
+        return nil, nil, nil, nil
+    end
+    
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "UniversalAimbotLoader"
     screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
     screenGui.ResetOnSpawn = false
+    print("ScreenGui created and parented")
     
     -- Main frame
     local mainFrame = Instance.new("Frame")
@@ -29,23 +75,12 @@ local function createLoadingGUI()
     mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     mainFrame.BorderSizePixel = 0
     mainFrame.Parent = screenGui
+    print("Main frame created")
     
     -- Corner rounding
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 12)
     corner.Parent = mainFrame
-    
-    -- Drop shadow effect
-    local shadow = Instance.new("ImageLabel")
-    shadow.Name = "Shadow"
-    shadow.BackgroundTransparency = 1
-    shadow.Position = UDim2.new(0, -10, 0, -10)
-    shadow.Size = UDim2.new(1, 20, 1, 20)
-    shadow.ZIndex = -1
-    shadow.Image = "rbxasset://textures/ui/ChatBubble/TailMask.png"
-    shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-    shadow.ImageTransparency = 0.8
-    shadow.Parent = mainFrame
     
     -- Title
     local title = Instance.new("TextLabel")
@@ -53,11 +88,12 @@ local function createLoadingGUI()
     title.Size = UDim2.new(1, 0, 0, 40)
     title.Position = UDim2.new(0, 0, 0, 10)
     title.BackgroundTransparency = 1
-    title.Text = "Universal Aimbot"
+    title.Text = "Universal Aimbot - TEST"
     title.TextColor3 = Color3.fromRGB(255, 255, 255)
     title.TextScaled = true
     title.Font = Enum.Font.GothamBold
     title.Parent = mainFrame
+    print("Title created")
     
     -- Subtitle
     local subtitle = Instance.new("TextLabel")
@@ -70,6 +106,7 @@ local function createLoadingGUI()
     subtitle.TextScaled = true
     subtitle.Font = Enum.Font.Gotham
     subtitle.Parent = mainFrame
+    print("Subtitle created")
     
     -- Loading bar background
     local loadingBarBG = Instance.new("Frame")
@@ -103,7 +140,7 @@ local function createLoadingGUI()
     statusText.Size = UDim2.new(1, 0, 0, 25)
     statusText.Position = UDim2.new(0, 0, 0, 130)
     statusText.BackgroundTransparency = 1
-    statusText.Text = "Initializing..."
+    statusText.Text = "GUI Test Successful!"
     statusText.TextColor3 = Color3.fromRGB(200, 200, 200)
     statusText.TextScaled = true
     statusText.Font = Enum.Font.Gotham
@@ -115,120 +152,29 @@ local function createLoadingGUI()
     progressText.Size = UDim2.new(1, 0, 0, 20)
     progressText.Position = UDim2.new(0, 0, 0, 160)
     progressText.BackgroundTransparency = 1
-    progressText.Text = "0%"
+    progressText.Text = "100%"
     progressText.TextColor3 = Color3.fromRGB(0, 162, 255)
     progressText.TextScaled = true
     progressText.Font = Enum.Font.GothamBold
     progressText.Parent = mainFrame
     
+    print("=== GUI CREATED SUCCESSFULLY ===")
     return screenGui, statusText, progressText, loadingBar
 end
 
--- Animate loading bar
-local function animateProgress(loadingBar, progressText, targetProgress)
-    local tween = game:GetService("TweenService"):Create(
-        loadingBar,
-        TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-        {Size = UDim2.new(targetProgress / 100, 0, 1, 0)}
-    )
-    tween:Play()
+-- Test the GUI creation
+local gui, statusText, progressText, loadingBar = createLoadingGUI()
+
+if gui then
+    print("SUCCESS: GUI should be visible now!")
+    print("Waiting 10 seconds before cleanup...")
     
-    local progressTween = game:GetService("TweenService"):Create(
-        progressText,
-        TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-        {TextTransparency = 0}
-    )
-    progressTween:Play()
+    -- Keep it visible for 10 seconds
+    wait(10)
     
-    -- Update progress text safely
-    spawn(function()
-        local currentProgress = 0
-        local progressStr = progressText.Text:gsub("%%", "")
-        if progressStr and progressStr ~= "" then
-            currentProgress = tonumber(progressStr) or 0
-        end
-        
-        for i = currentProgress, targetProgress do
-            progressText.Text = tostring(i) .. "%"
-            wait(0.01)
-        end
-    end)
+    print("Cleaning up test GUI...")
+    gui:Destroy()
+    print("Test completed!")
+else
+    print("FAILED: Could not create GUI")
 end
-
--- Function to load the script
-local function loadScript()
-    -- Create loading GUI
-    local gui, statusText, progressText, loadingBar = createLoadingGUI()
-    
-    -- Simulate loading steps
-    statusText.Text = "Connecting to repository..."
-    animateProgress(loadingBar, progressText, 25)
-    wait(1)
-    
-    statusText.Text = "Downloading script..."
-    animateProgress(loadingBar, progressText, 50)
-    
-    -- Attempt to load the script
-    local success, result = pcall(function()
-        return game:HttpGet(config.repository .. "AimbotWithObsidian.lua")
-    end)
-    
-    animateProgress(loadingBar, progressText, 75)
-    wait(0.5)
-    
-    -- Check if the script was loaded successfully
-    if success then
-        statusText.Text = "Script loaded successfully!"
-        animateProgress(loadingBar, progressText, 100)
-        wait(1)
-        
-        statusText.Text = "Executing aimbot..."
-        wait(1)
-        
-        -- Execute the script
-        loadstring(result)()
-        
-        -- Success message
-        statusText.Text = "Universal Aimbot loaded!"
-        statusText.TextColor3 = Color3.fromRGB(0, 255, 0)
-        wait(2)
-        
-        -- Remove GUI
-        gui:Destroy()
-        print("Script loaded successfully!")
-    else
-        -- Display error in GUI
-        statusText.Text = "Failed to load script!"
-        statusText.TextColor3 = Color3.fromRGB(255, 0, 0)
-        progressText.Text = "Error"
-        progressText.TextColor3 = Color3.fromRGB(255, 0, 0)
-        loadingBar.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-        
-        -- Show error details
-        wait(2)
-        statusText.Text = "Error: " .. tostring(result)
-        statusText.Font = Enum.Font.Gotham
-        
-        warn("Failed to load script: " .. tostring(result))
-        wait(5)
-        gui:Destroy()
-    end
-end
-
--- Execute the loader
-loadScript()
-
--- Instructions for repository setup (for reference)
---[[
-Repository Structure:
-- UniversalAimbot (main repository)
-  - AimbotWithObsidian.lua (main script)
-  - aimbotmodule (module file)
-  - README.md (documentation)
-
-To use this loader:
-1. Create a GitHub repository named "UniversalAimbot"
-2. Upload the script files to the repository
-3. Make sure the files are in the main branch
-4. Execute this loader script in your game
-]]
