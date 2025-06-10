@@ -1585,7 +1585,7 @@ ESPGroup:AddToggle("OffScreenArrowAntiAliasing", {
 
 -- Radar toggle and settings (Made by Blissful#4992)
 ESPGroup:AddDivider()
-ESPGroup:AddLabel("Radar Settings (Made by Blissful#4992)")
+ESPGroup:AddLabel("Radar Settings")
 
 ESPGroup:AddToggle("RadarEnabled", {
     Text = "Show Radar",
