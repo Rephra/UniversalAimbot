@@ -16,30 +16,6 @@ local AimbotModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/
 local Options = Library.Options
 local Toggles = Library.Toggles
 
--- Device detection
-local UserInputService = game:GetService("UserInputService")
-local IsMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled and not UserInputService.MouseEnabled
-
--- Mobile aimbot button
-local MobileAimbotButton
-if IsMobile then
-    print("Mobile device detected! Setting up mobile aimbot controls...")
-
-    -- Adjust aimbot settings for mobile
-    if AimbotModule then
-        -- Increase FOV radius for easier targeting on mobile
-        AimbotModule.FOVSettings.Radius = 150
-        -- Increase thickness for better visibility on small screens
-        AimbotModule.FOVSettings.Thickness = 2
-        -- Make the FOV circle more visible
-        AimbotModule.FOVSettings.Transparency = 0.7
-        -- Increase sensitivity for better mobile experience
-        AimbotModule.Settings.Sensitivity = 0.1
-        -- Set a larger lock part for easier targeting
-        AimbotModule.Settings.LockPart = "HumanoidRootPart"
-    end
-end
-
 -- Create the main window
 local Window = Library:CreateWindow({
     Title = "Nullinject",
@@ -49,121 +25,8 @@ local Window = Library:CreateWindow({
     AutoShow = true,
     ToggleKeybind = Enum.KeyCode.RightShift,
     NotifySide = "Right",
-    ShowCustomCursor = not IsMobile, -- Disable custom cursor on mobile
+    ShowCustomCursor = true,
 })
-
--- Create mobile aimbot button if on mobile device
-if IsMobile then
-    -- Create a frame for the mobile button
-    MobileAimbotButton = Instance.new("TextButton")
-    MobileAimbotButton.Name = "MobileAimbotButton"
-    MobileAimbotButton.Text = "AIMBOT"
-    MobileAimbotButton.Size = UDim2.new(0, 120, 0, 60)
-    MobileAimbotButton.Position = UDim2.new(0.5, -60, 0.9, -30) -- Bottom center
-    MobileAimbotButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-    MobileAimbotButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    MobileAimbotButton.BorderSizePixel = 0
-    MobileAimbotButton.TextSize = 20
-    MobileAimbotButton.Font = Enum.Font.GothamBold
-    MobileAimbotButton.Parent = game:GetService("CoreGui")
-
-    -- Add corner radius
-    local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 10)
-    UICorner.Parent = MobileAimbotButton
-
-    -- Add shadow
-    local Shadow = Instance.new("ImageLabel")
-    Shadow.Name = "Shadow"
-    Shadow.AnchorPoint = Vector2.new(0.5, 0.5)
-    Shadow.BackgroundTransparency = 1
-    Shadow.Position = UDim2.new(0.5, 0, 0.5, 0)
-    Shadow.Size = UDim2.new(1, 24, 1, 24)
-    Shadow.ZIndex = -1
-    Shadow.Image = "rbxassetid://6014261993"
-    Shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-    Shadow.ImageTransparency = 0.5
-    Shadow.ScaleType = Enum.ScaleType.Slice
-    Shadow.SliceCenter = Rect.new(49, 49, 450, 450)
-    Shadow.Parent = MobileAimbotButton
-
-    -- Mobile button functionality
-    local MobileAimbotActive = false
-
-    -- Make sure button stays on top and visible
-    MobileAimbotButton.ZIndex = 9999
-
-    -- Handle touch input for the button
-    MobileAimbotButton.TouchTap:Connect(function()
-        MobileAimbotActive = not MobileAimbotActive
-
-        if MobileAimbotActive then
-            MobileAimbotButton.BackgroundColor3 = Color3.fromRGB(50, 255, 50)
-            MobileAimbotButton.Text = "AIMBOT ON"
-            -- Enable aimbot
-            if AimbotModule and AimbotModule.Settings then
-                AimbotModule.Settings.Enabled = true
-            end
-            -- Simulate the trigger key being pressed
-            if getgenv().ExunysDeveloperAimbot then
-                getgenv().ExunysDeveloperAimbot.Running = true
-            end
-
-            -- Notify user
-            Library:Notify({
-                Title = "Aimbot Activated",
-                Description = "Mobile aimbot is now active",
-                Time = 2,
-            })
-        else
-            MobileAimbotButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-            MobileAimbotButton.Text = "AIMBOT OFF"
-            -- Disable aimbot
-            if getgenv().ExunysDeveloperAimbot then
-                getgenv().ExunysDeveloperAimbot.Running = false
-                -- Cancel any active lock
-                if getgenv().ExunysDeveloperAimbot.Locked then
-                    getgenv().ExunysDeveloperAimbot.Locked = nil
-                end
-            end
-
-            -- Notify user
-            Library:Notify({
-                Title = "Aimbot Deactivated",
-                Description = "Mobile aimbot is now inactive",
-                Time = 2,
-            })
-        end
-    end)
-
-    -- Make button draggable for better mobile experience
-    local Dragging = false
-    local DragStart = nil
-    local StartPos = nil
-
-    local TouchLongPressConnection = MobileAimbotButton.TouchLongPress:Connect(function(touchPositions, state)
-        Dragging = true
-        DragStart = touchPositions[1]
-        StartPos = MobileAimbotButton.Position
-    end)
-
-    -- Store connections for cleanup
-    UserInputService.TouchMovedConnection = UserInputService.TouchMoved:Connect(function(touch, gameProcessed)
-        if Dragging and DragStart then
-            local delta = touch.Position - DragStart
-            MobileAimbotButton.Position = UDim2.new(
-                StartPos.X.Scale, 
-                StartPos.X.Offset + delta.X,
-                StartPos.Y.Scale, 
-                StartPos.Y.Offset + delta.Y
-            )
-        end
-    end)
-
-    UserInputService.TouchEndedConnection = UserInputService.TouchEnded:Connect(function(touch, gameProcessed)
-        Dragging = false
-    end)
-end
 
 -- Create tabs
 local Tabs = {
@@ -865,13 +728,13 @@ local function DrawOffScreenArrows(plr)
                         end
 
                         Arrow.Visible = true
-                    else
-                        Arrow.Visible = false
+                    else 
+                        Arrow.Visible = false 
                     end
-                else
-                    Arrow.Visible = false
+                else 
+                    Arrow.Visible = false 
                 end
-            else
+            else 
                 Arrow.Visible = false
             end
         end)
@@ -1275,13 +1138,13 @@ local function InitializeRadar()
                     local hum = char:FindFirstChildOfClass("Humanoid")
                     local scale = ESPSettings.RadarScale
                     local relx, rely = GetRelative(char.PrimaryPart.Position)
-                    local newpos = ESPSettings.RadarPosition - Vector2.new(relx * scale, rely * scale)
+                    local newpos = ESPSettings.RadarPosition - Vector2.new(relx * scale, rely * scale) 
 
-                    if (newpos - ESPSettings.RadarPosition).magnitude < ESPSettings.RadarRadius-2 then
-                        PlayerDot.Radius = 3
+                    if (newpos - ESPSettings.RadarPosition).magnitude < ESPSettings.RadarRadius-2 then 
+                        PlayerDot.Radius = 3   
                         PlayerDot.Position = newpos
                         PlayerDot.Visible = true
-                    else
+                    else 
                         local dist = (ESPSettings.RadarPosition - newpos).magnitude
                         local calc = (ESPSettings.RadarPosition - newpos).unit * (dist - ESPSettings.RadarRadius)
                         local inside = Vector2.new(newpos.X + calc.X, newpos.Y + calc.Y)
@@ -1307,12 +1170,12 @@ local function InitializeRadar()
                     if ESPSettings.RadarHealthColor then
                         local healthPercent = hum.Health / hum.MaxHealth
                         PlayerDot.Color = Color3.fromRGB(
-                                255 * (1 - healthPercent),
-                                255 * healthPercent,
-                                0
+                            255 * (1 - healthPercent),
+                            255 * healthPercent,
+                            0
                         )
                     end
-                else
+                else 
                     PlayerDot.Visible = false
                     if not game.Players:FindFirstChild(plr.Name) then
                         PlayerDot:Remove()
@@ -1387,8 +1250,8 @@ local function InitializeRadar()
     local offset = Vector2.new(0, 0)
 
     local dragBeginConnection = game:GetService("UserInputService").InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 and
-                (Vector2.new(mouse.X, mouse.Y + inset.Y) - ESPSettings.RadarPosition).magnitude < ESPSettings.RadarRadius then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 and 
+           (Vector2.new(mouse.X, mouse.Y + inset.Y) - ESPSettings.RadarPosition).magnitude < ESPSettings.RadarRadius then
             offset = ESPSettings.RadarPosition - Vector2.new(mouse.X, mouse.Y)
             dragging = true
         end
@@ -1418,7 +1281,7 @@ local function InitializeRadar()
         if ESPSettings.Radar and (Vector2.new(mouse.X, mouse.Y + inset.Y) - ESPSettings.RadarPosition).magnitude < ESPSettings.RadarRadius then
             mouseDot.Position = Vector2.new(mouse.X, mouse.Y + inset.Y)
             mouseDot.Visible = true
-        else
+        else 
             mouseDot.Visible = false
         end
     end)
@@ -2445,51 +2308,12 @@ Library:OnUnload(function()
         getgenv().ExunysDeveloperAimbot = nil
     end
 
-    -- Clean up mobile button and its connections if it exists
-    if IsMobile then
-        -- Clean up any mobile-specific connections
-        pcall(function()
-            if UserInputService.TouchMovedConnection then
-                UserInputService.TouchMovedConnection:Disconnect()
-                UserInputService.TouchMovedConnection = nil
-            end
-
-            if UserInputService.TouchEndedConnection then
-                UserInputService.TouchEndedConnection:Disconnect()
-                UserInputService.TouchEndedConnection = nil
-            end
-
-            if TouchLongPressConnection then
-                TouchLongPressConnection:Disconnect()
-                TouchLongPressConnection = nil
-            end
-        end)
-
-        -- Remove the mobile button
-        if MobileAimbotButton then
-            pcall(function()
-                MobileAimbotButton:Destroy()
-                MobileAimbotButton = nil
-            end)
-        end
-
-        print("Mobile aimbot controls cleaned up!")
-    end
-
     print("GUI completely unloaded and cleaned up!")
 end)
 
 -- Welcome notification
-if IsMobile then
-    Library:Notify({
-        Title = "Universal Aimbot (Mobile)",
-        Description = "Aimbot script loaded successfully!\nTap the AIMBOT button at the bottom of your screen to toggle aimbot.",
-        Time = 7,
-    })
-else
-    Library:Notify({
-        Title = "Universal Aimbot",
-        Description = "Aimbot script loaded successfully!\nUse " .. tostring(Options.TriggerKey and Options.TriggerKey.Value or "Right Mouse") .. " to aim.",
-        Time = 5,
-    })
-end
+Library:Notify({
+    Title = "Universal Aimbot",
+    Description = "Aimbot script loaded successfully!\nUse " .. tostring(Options.TriggerKey and Options.TriggerKey.Value or "Right Mouse") .. " to aim.",
+    Time = 5,
+})
