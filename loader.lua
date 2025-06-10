@@ -3,6 +3,15 @@
 
 print("=== UNIVERSAL AIMBOT LOADER STARTING ===")
 
+-- Debug information
+print("Game service availability check:")
+print("- Players service:", game.Players ~= nil)
+print("- LocalPlayer:", game.Players.LocalPlayer ~= nil)
+if game.Players.LocalPlayer then
+    print("- PlayerGui:", game.Players.LocalPlayer:FindFirstChild("PlayerGui") ~= nil)
+end
+print("- TweenService:", game:GetService("TweenService") ~= nil)
+
 -- Configuration
 local config = {
     username = "Nullinject",
@@ -16,6 +25,36 @@ print("Created by " .. config.username)
 print("Version: " .. config.version)
 print("Loading script...")
 
+-- Immediate GUI test
+print("=== PERFORMING IMMEDIATE GUI TEST ===")
+local testSuccess, testError = pcall(function()
+    local testGui = Instance.new("ScreenGui")
+    testGui.Name = "TestGUI"
+    testGui.Parent = game.Players.LocalPlayer.PlayerGui
+    
+    local testFrame = Instance.new("Frame")
+    testFrame.Size = UDim2.new(0, 200, 0, 50)
+    testFrame.Position = UDim2.new(0, 10, 0, 10)
+    testFrame.BackgroundColor3 = Color3.new(1, 0, 0)
+    testFrame.Parent = testGui
+    
+    local testLabel = Instance.new("TextLabel")
+    testLabel.Size = UDim2.new(1, 0, 1, 0)
+    testLabel.BackgroundTransparency = 1
+    testLabel.Text = "GUI TEST WORKING"
+    testLabel.TextColor3 = Color3.new(1, 1, 1)
+    testLabel.TextScaled = true
+    testLabel.Parent = testFrame
+    
+    wait(1)
+    testGui:Destroy()
+    print("GUI test successful!")
+end)
+
+if not testSuccess then
+    print("GUI test failed: " .. tostring(testError))
+end
+
 -- Add error protection wrapper
 local function safeExecute(func, errorMsg)
     local success, result = pcall(func)
@@ -23,19 +62,75 @@ local function safeExecute(func, errorMsg)
         print("ERROR: " .. errorMsg)
         print("Details: " .. tostring(result))
         return false
+    end    return true
+end
+
+-- Simple fallback GUI
+local function createSimpleGUI()
+    print("=== CREATING SIMPLE FALLBACK GUI ===")
+    
+    local success, result = pcall(function()
+        -- Wait a bit to ensure player is ready
+        wait(0.5)
+        
+        local player = game.Players.LocalPlayer
+        if not player or not player.PlayerGui then
+            error("Player or PlayerGui not available")
+        end
+        
+        local screenGui = Instance.new("ScreenGui")
+        screenGui.Name = "SimpleAimbotLoader"
+        screenGui.Parent = player.PlayerGui
+        
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(0, 300, 0, 100)
+        frame.Position = UDim2.new(0.5, -150, 0.5, -50)
+        frame.BackgroundColor3 = Color3.new(0, 0, 0)
+        frame.BackgroundTransparency = 0.3
+        frame.Parent = screenGui
+        
+        local textLabel = Instance.new("TextLabel")
+        textLabel.Size = UDim2.new(1, 0, 1, 0)
+        textLabel.BackgroundTransparency = 1
+        textLabel.Text = "Loading Universal Aimbot..."
+        textLabel.TextColor3 = Color3.new(1, 1, 1)
+        textLabel.TextScaled = true
+        textLabel.Parent = frame
+        
+        return screenGui, textLabel, textLabel, nil
+    end)
+    
+    if success then
+        print("=== SIMPLE GUI CREATED SUCCESSFULLY ===")
+        return result
+    else
+        print("ERROR creating simple GUI: " .. tostring(result))
+        return nil, nil, nil, nil
     end
-    return true
 end
 
 -- Create loading GUI
 local function createLoadingGUI()
     print("=== CREATING LOADING GUI ===")
     
+    -- Add more robust error checking
+    if not game.Players.LocalPlayer then
+        print("ERROR: LocalPlayer not found!")
+        return nil, nil, nil, nil
+    end
+    
+    local playerGui = game.Players.LocalPlayer:FindFirstChild("PlayerGui")
+    if not playerGui then
+        print("ERROR: PlayerGui not found!")
+        return nil, nil, nil, nil
+    end
+    
     local success, result = pcall(function()
         local screenGui = Instance.new("ScreenGui")
         screenGui.Name = "UniversalAimbotLoader"
-        screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+        screenGui.Parent = playerGui
         screenGui.ResetOnSpawn = false
+        screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
         print("ScreenGui created successfully")
         
         -- Main frame
@@ -138,8 +233,7 @@ local function createLoadingGUI()
         progressText.TextScaled = true
         progressText.Font = Enum.Font.GothamBold
         progressText.Parent = mainFrame
-        
-        return screenGui, statusText, progressText, loadingBar
+          return screenGui, statusText, progressText, loadingBar
     end)
     
     if success then
@@ -147,7 +241,8 @@ local function createLoadingGUI()
         return result
     else
         print("ERROR creating GUI: " .. tostring(result))
-        return nil, nil, nil, nil
+        -- Try a simpler GUI as fallback
+        return createSimpleGUI()
     end
 end
 
@@ -189,6 +284,38 @@ local function loadScript()
     
     if not gui then
         print("CRITICAL ERROR: Could not create GUI!")
+        print("This might be due to:")
+        print("1. LocalPlayer not being available yet")
+        print("2. PlayerGui not being ready")
+        print("3. Insufficient permissions")
+        print("Continuing without GUI...")
+        
+        -- Continue script execution without GUI
+        print("Attempting to download script directly...")
+        local success, result = pcall(function()
+            return game:HttpGet(config.repository .. "AimbotWithObsidian.lua")
+        end)
+        
+        if success then
+            print("Script downloaded successfully! Executing...")
+            local executeSuccess, executeResult = pcall(function()
+                local compiledScript = loadstring(result)
+                if compiledScript then
+                    compiledScript()
+                    return true
+                else
+                    error("Failed to compile downloaded script")
+                end
+            end)
+            
+            if executeSuccess then
+                print("Universal Aimbot loaded successfully!")
+            else
+                print("ERROR executing script: " .. tostring(executeResult))
+            end
+        else
+            print("ERROR downloading script: " .. tostring(result))
+        end
         return
     end
     
