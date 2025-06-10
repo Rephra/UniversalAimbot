@@ -19,7 +19,7 @@ local Toggles = Library.Toggles
 -- Create the main window
 local Window = Library:CreateWindow({
     Title = "Nullinject",
-    Footer = "Powered by Exunys & Obsidian | v1.0.0",
+    Footer = "Credit Exunyx and made by Nullinject | v1.0.0",
     Size = UDim2.fromOffset(750, 650),
     Center = true,
     AutoShow = true,
