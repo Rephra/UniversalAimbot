@@ -1,4 +1,3 @@
-loadstring([[
 -- Universal Aimbot Loader
 -- Created by Nullinject
 
@@ -218,4 +217,18 @@ end
 
 -- Execute the loader
 loadScript()
-]])()
+
+-- Instructions for repository setup (for reference)
+--[[
+Repository Structure:
+- UniversalAimbot (main repository)
+  - AimbotWithObsidian.lua (main script)
+  - aimbotmodule (module file)
+  - README.md (documentation)
+
+To use this loader:
+1. Create a GitHub repository named "UniversalAimbot"
+2. Upload the script files to the repository
+3. Make sure the files are in the main branch
+4. Execute this loader script in your game
+]]
