@@ -18,13 +18,13 @@ local Toggles = Library.Toggles
 
 -- Create the main window
 local Window = Library:CreateWindow({    Title = "Vulpine",
-    Footer = "Credit Exunyx and made by Vulpine | v1.0.0",
-    Size = UDim2.fromOffset(750, 650),
-    Center = true,
-    AutoShow = true,
-    ToggleKeybind = Enum.KeyCode.RightShift,
-    NotifySide = "Right",
-    ShowCustomCursor = true,
+                                         Footer = "Credit Exunyx and made by Vulpine | v1.0.0",
+                                         Size = UDim2.fromOffset(750, 650),
+                                         Center = true,
+                                         AutoShow = true,
+                                         ToggleKeybind = Enum.KeyCode.RightShift,
+                                         NotifySide = "Right",
+                                         ShowCustomCursor = true,
 })
 
 -- Create tabs
@@ -33,6 +33,7 @@ local Tabs = {
     FOV = Window:AddTab("FOV Settings", "circle"),
     ESP = Window:AddTab("ESP", "eye"),
     Players = Window:AddTab("Players", "users"),
+    Sweat = Window:AddTab("Sweat", "droplet"),
     ["UI Settings"] = Window:AddTab("UI Settings", "settings"),
 }
 
@@ -727,13 +728,13 @@ local function DrawOffScreenArrows(plr)
                         end
 
                         Arrow.Visible = true
-                    else 
-                        Arrow.Visible = false 
+                    else
+                        Arrow.Visible = false
                     end
-                else 
-                    Arrow.Visible = false 
+                else
+                    Arrow.Visible = false
                 end
-            else 
+            else
                 Arrow.Visible = false
             end
         end)
@@ -1137,13 +1138,13 @@ local function InitializeRadar()
                     local hum = char:FindFirstChildOfClass("Humanoid")
                     local scale = ESPSettings.RadarScale
                     local relx, rely = GetRelative(char.PrimaryPart.Position)
-                    local newpos = ESPSettings.RadarPosition - Vector2.new(relx * scale, rely * scale) 
+                    local newpos = ESPSettings.RadarPosition - Vector2.new(relx * scale, rely * scale)
 
-                    if (newpos - ESPSettings.RadarPosition).magnitude < ESPSettings.RadarRadius-2 then 
-                        PlayerDot.Radius = 3   
+                    if (newpos - ESPSettings.RadarPosition).magnitude < ESPSettings.RadarRadius-2 then
+                        PlayerDot.Radius = 3
                         PlayerDot.Position = newpos
                         PlayerDot.Visible = true
-                    else 
+                    else
                         local dist = (ESPSettings.RadarPosition - newpos).magnitude
                         local calc = (ESPSettings.RadarPosition - newpos).unit * (dist - ESPSettings.RadarRadius)
                         local inside = Vector2.new(newpos.X + calc.X, newpos.Y + calc.Y)
@@ -1169,12 +1170,12 @@ local function InitializeRadar()
                     if ESPSettings.RadarHealthColor then
                         local healthPercent = hum.Health / hum.MaxHealth
                         PlayerDot.Color = Color3.fromRGB(
-                            255 * (1 - healthPercent),
-                            255 * healthPercent,
-                            0
+                                255 * (1 - healthPercent),
+                                255 * healthPercent,
+                                0
                         )
                     end
-                else 
+                else
                     PlayerDot.Visible = false
                     if not game.Players:FindFirstChild(plr.Name) then
                         PlayerDot:Remove()
@@ -1249,8 +1250,8 @@ local function InitializeRadar()
     local offset = Vector2.new(0, 0)
 
     local dragBeginConnection = game:GetService("UserInputService").InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 and 
-           (Vector2.new(mouse.X, mouse.Y + inset.Y) - ESPSettings.RadarPosition).magnitude < ESPSettings.RadarRadius then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 and
+                (Vector2.new(mouse.X, mouse.Y + inset.Y) - ESPSettings.RadarPosition).magnitude < ESPSettings.RadarRadius then
             offset = ESPSettings.RadarPosition - Vector2.new(mouse.X, mouse.Y)
             dragging = true
         end
@@ -1280,7 +1281,7 @@ local function InitializeRadar()
         if ESPSettings.Radar and (Vector2.new(mouse.X, mouse.Y + inset.Y) - ESPSettings.RadarPosition).magnitude < ESPSettings.RadarRadius then
             mouseDot.Position = Vector2.new(mouse.X, mouse.Y + inset.Y)
             mouseDot.Visible = true
-        else 
+        else
             mouseDot.Visible = false
         end
     end)
@@ -2309,6 +2310,164 @@ Library:OnUnload(function()
 
     print("GUI completely unloaded and cleaned up!")
 end)
+
+-- Sweat Tab
+-- Only keeping Stretch Resolution and FOV Changer features
+local SweatAdvancedGroup = Tabs.Sweat:AddRightGroupbox("Sweat Settings", "settings")
+
+-- Create a separate groupbox for Low Graphics
+local LowGraphicsGroup = Tabs.Sweat:AddLeftGroupbox("Low Graphics Settings", "image")
+
+-- Add Low Graphics toggle to its own groupbox
+LowGraphicsGroup:AddToggle("LowGraphics", {
+    Text = "Enable Low Graphics",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            -- Save original materials to restore later
+            if not getgenv().OriginalMaterials then
+                getgenv().OriginalMaterials = {}
+                for i, v in pairs(workspace:GetDescendants()) do
+                    if v:IsA("Part") then
+                        getgenv().OriginalMaterials[v] = v.Material
+                    end
+                end
+            end
+
+            -- Apply low graphics (change all parts to SmoothPlastic)
+            for i, v in pairs(workspace:GetDescendants()) do
+                if v:IsA("Part") then 
+                    v.Material = Enum.Material.SmoothPlastic
+                end
+            end
+
+            Library:Notify({
+                Title = "Low Graphics Enabled",
+                Description = "Low graphics mode is now active",
+                Time = 2,
+            })
+        else
+            -- Restore original materials if available
+            if getgenv().OriginalMaterials then
+                for part, material in pairs(getgenv().OriginalMaterials) do
+                    if part and part:IsA("Part") then
+                        pcall(function() part.Material = material end)
+                    end
+                end
+            end
+
+            Library:Notify({
+                Title = "Low Graphics Disabled",
+                Description = "Low graphics mode is now inactive",
+                Time = 2,
+            })
+        end
+    end,
+})
+
+-- Stretch Resolution
+SweatAdvancedGroup:AddToggle("StretchResolution", {
+    Text = "Enable Stretch Resolution",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            -- Initialize stretch resolution
+            getgenv().Resolution = {
+                [".gg/scripters"] = 0.65
+            }
+
+            if getgenv().gg_scripters == nil then
+                game:GetService("RunService").RenderStepped:Connect(
+                    function()
+                        local Camera = workspace.CurrentCamera
+                        Camera.CFrame = Camera.CFrame * CFrame.new(0, 0, 0, 1, 0, 0, 0, getgenv().Resolution[".gg/scripters"], 0, 0, 0, 1)
+                    end
+                )
+            end
+            getgenv().gg_scripters = "Aori0001"
+
+            Library:Notify({
+                Title = "Stretch Resolution Enabled",
+                Description = "Stretch resolution is now active",
+                Time = 2,
+            })
+        else
+            -- Disable stretch resolution (reset to default)
+            if getgenv().Resolution then
+                getgenv().Resolution[".gg/scripters"] = 1
+            end
+
+            Library:Notify({
+                Title = "Stretch Resolution Disabled",
+                Description = "Stretch resolution is now inactive",
+                Time = 2,
+            })
+        end
+    end,
+})
+
+SweatAdvancedGroup:AddSlider("StretchAmount", {
+    Text = "Stretch Amount",
+    Default = 0.65,
+    Min = 0.1,
+    Max = 1,
+    Rounding = 2,
+    Callback = function(Value)
+        if getgenv().Resolution then
+            getgenv().Resolution[".gg/scripters"] = Value
+        end
+    end,
+})
+
+-- FOV Changer
+SweatAdvancedGroup:AddToggle("FOVChanger", {
+    Text = "Enable FOV Changer",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            -- Save original FOV to restore later
+            if not getgenv().OriginalFOV then
+                getgenv().OriginalFOV = workspace.Camera.FieldOfView
+            end
+
+            -- Set FOV to the value from the slider or default to 120
+            workspace.Camera.FieldOfView = Options.FOVValue and Options.FOVValue.Value or 120
+
+            Library:Notify({
+                Title = "FOV Changer Enabled",
+                Description = "FOV changer is now active",
+                Time = 2,
+            })
+        else
+            -- Restore original FOV
+            if getgenv().OriginalFOV then
+                workspace.Camera.FieldOfView = getgenv().OriginalFOV
+            end
+
+            Library:Notify({
+                Title = "FOV Changer Disabled",
+                Description = "FOV changer is now inactive",
+                Time = 2,
+            })
+        end
+    end,
+})
+
+-- Low Graphics is now in its own groupbox
+
+SweatAdvancedGroup:AddSlider("FOVValue", {
+    Text = "FOV Value",
+    Default = 120,
+    Min = 70,
+    Max = 120,
+    Rounding = 0,
+    Callback = function(Value)
+        -- Only update FOV if FOV Changer is enabled
+        if Toggles.FOVChanger and Toggles.FOVChanger.Value then
+            workspace.Camera.FieldOfView = Value
+        end
+    end,
+})
 
 -- Welcome notification
 Library:Notify({
