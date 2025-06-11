@@ -89,7 +89,8 @@ local function createLoadingGUI()
     TitleLabel.Font = Enum.Font.GothamBold
     TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
     TitleLabel.Parent = HeaderFrame
-      -- Subtitle
+    
+    -- Subtitle
     local SubtitleLabel = Instance.new("TextLabel")
     SubtitleLabel.Name = "SubtitleLabel"
     SubtitleLabel.Size = UDim2.new(0, 320, 0, 22)
@@ -223,7 +224,8 @@ local function startLoadingSequence(gui)
         {percent = 40, status = "Loading Exunys Aimbot Module...", detail = "• Downloading aimbot core\n• Setting up FOV calculations\n• Configuring target detection"},
         {percent = 58, status = "Initializing ESP systems...", detail = "• Setting up player detection\n• Configuring visual overlays\n• Loading skeleton tracking"},
         {percent = 75, status = "Setting up targeting algorithms...", detail = "• Calibrating aim smoothing\n• Loading prediction systems\n• Setting up lock-on mechanics"},
-        {percent = 90, status = "Finalizing configuration...", detail = "• Applying user settings\n• Loading keybind system\n• Preparing user interface"},        {percent = 100, status = "Aimbot ready!", detail = "• All systems operational\n• Targeting active\n• Ready for combat assistance, Rephra!"}
+        {percent = 90, status = "Finalizing configuration...", detail = "• Applying user settings\n• Loading keybind system\n• Preparing user interface"},
+        {percent = 100, status = "Aimbot ready!", detail = "• All systems operational\n• Targeting active\n• Ready for combat assistance, Rephra!"}
     }
     
     local function processStep(stepIndex)
@@ -248,6 +250,65 @@ local function startLoadingSequence(gui)
     return processStep(1)
 end
 
+-- Function to load the main script from GitHub
+local function loadMainScript()
+    -- Try to load ChartRenderer.lua from the same repository
+    local success, result = pcall(function()
+        return game:HttpGet("https://raw.githubusercontent.com/Rephra/DataVisualization/main/ChartRenderer.lua")
+    end)
+    
+    if success and result then
+        return result, "github"
+    end
+    
+    -- Fallback: Try loading from local file if it exists
+    local possiblePaths = {
+        "ChartRenderer.lua",
+        "UniAimbot.lua",
+        "MainScript.lua"
+    }
+    
+    for _, path in ipairs(possiblePaths) do
+        if isfile and readfile and isfile(path) then
+            local fileSuccess, content = pcall(readfile, path)
+            if fileSuccess and content then
+                return content, "file"
+            end
+        end
+    end
+    
+    -- Last resort: Load directly from Exunys repository
+    local exunysSuccess, exunysResult = pcall(function()
+        return game:HttpGet("https://raw.githubusercontent.com/Exunys/Aimbot-V3/main/src/Aimbot.lua")
+    end)
+    
+    if exunysSuccess then
+        return [[
+            -- Loading Obsidian Library first
+            local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/refs/heads/main/"
+            local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+            
+            -- Load and execute the aimbot
+            local AimbotModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/Exunys/Aimbot-V3/main/src/Aimbot.lua"))()
+            AimbotModule.Load()
+            
+            print("Basic aimbot loaded successfully!")
+        ]], "fallback"
+    end
+    
+    -- Ultimate fallback
+    return [[
+        print("Vulpine Universal Aimbot - Demo Mode")
+        print("Could not load main script, running in demo mode")
+        
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "Vulpine Aimbot";
+            Text = "Demo mode - main script loading failed!";
+            Duration = 5;
+        })
+    ]], "demo"
+end
+
 -- Main loader execution
 local function executeLoader()
     local gui = createLoadingGUI()
@@ -256,7 +317,8 @@ local function executeLoader()
     spawn(function()
         local loadingComplete = startLoadingSequence(gui)
         if loadingComplete then
-            -- Load the main script            wait(0.5)
+            -- Load the main script
+            wait(0.5)
             gui.StatusLabel.Text = "Launching Universal Aimbot..."
             
             local success, result = pcall(function()
@@ -266,12 +328,17 @@ local function executeLoader()
                 end
                 _G.VulpineAimbotScriptLoading = true
                 
-                -- Load the main script content from local file
-                local scriptContent
-                if readfile and isfile and isfile("c:\\Users\\thebi\\OneDrive\\Documents\\Change\\Aimbot\\UniAimbot.lua") then
-                    scriptContent = readfile("c:\\Users\\thebi\\OneDrive\\Documents\\Change\\Aimbot\\UniAimbot.lua")
+                -- Load the main script content
+                local scriptContent, loadMethod = loadMainScript()
+                
+                if loadMethod == "demo" then
+                    gui.StatusLabel.Text = "Running in demo mode..."
+                    gui.StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+                elseif loadMethod == "fallback" then
+                    gui.StatusLabel.Text = "Loading basic aimbot..."
+                    gui.StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
                 else
-                    error("Main UniAimbot.lua script file not found!")
+                    gui.StatusLabel.Text = "Loading main aimbot script..."
                 end
                 
                 -- Execute the script
@@ -282,19 +349,21 @@ local function executeLoader()
                 _G.VulpineAimbotScriptLoading = false
                 
                 if executeSuccess then
-                    return executeResult
+                    return true
                 else
                     error("Script execution failed: " .. tostring(executeResult))
                 end
-            end)if success then
+            end)
+            
+            if success then
                 gui.StatusLabel.Text = "Universal Aimbot loaded successfully!"
                 gui.SubtitleLabel.Text = "Vulpine Universal Aimbot is now active for Rephra!"
-                wait(1)
+                wait(2)
                 gui.ScreenGui:Destroy()
             else
                 gui.StatusLabel.Text = "Error loading aimbot: " .. tostring(result)
                 gui.StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-                wait(3)
+                wait(5)
                 gui.ScreenGui:Destroy()
             end
         end
