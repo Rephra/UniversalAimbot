@@ -17,9 +17,8 @@ local Options = Library.Options
 local Toggles = Library.Toggles
 
 -- Create the main window
-local Window = Library:CreateWindow({
-    Title = "Nullinject",
-    Footer = "Credit Exunyx and made by Nullinject | v1.0.0",
+local Window = Library:CreateWindow({    Title = "Vulpine",
+    Footer = "Credit Exunyx and made by Vulpine | v1.0.0",
     Size = UDim2.fromOffset(750, 650),
     Center = true,
     AutoShow = true,
