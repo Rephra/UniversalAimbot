@@ -364,7 +364,7 @@ local SilentAimToggle = ChecksGroup:AddToggle("SilentAim", {
                         local method = getnamecallmethod()
 
                         -- Check if it's a relevant firing method
-                        if (method == "FireServer" or method == "InvokeServer") and 
+                        if (method == "FireServer" or method == "InvokeServer") and
                            (self.Name == "RemoteEvent" or self.Name:lower():find("fire") or self.Name:lower():find("shoot")) and
                            AimbotModule.Settings.SilentAim and
                            AimbotModule.Settings.Enabled then
@@ -736,7 +736,7 @@ SilentAimGroup:AddToggle("SilentAimEnabled", {
                     local method = getnamecallmethod()
 
                     -- Check if it's a relevant firing method
-                    if (method == "FireServer" or method == "InvokeServer") and 
+                    if (method == "FireServer" or method == "InvokeServer") and
                        (self.Name == "RemoteEvent" or self.Name:lower():find("fire") or self.Name:lower():find("shoot")) and
                        AimbotModule.Settings.SilentAim and
                        AimbotModule.Settings.Enabled then
@@ -2026,6 +2026,77 @@ PlayerAddedConnection = game.Players.PlayerAdded:Connect(function(newplr)
     end
 end)
 
+-- Function to clean up ESP objects and connections
+local function CleanupESP()
+    -- Disconnect all ESP connections
+    for playerName, connection in pairs(ESPConnections) do
+        if connection and connection.Disconnect then
+            pcall(function() connection:Disconnect() end)
+        end
+    end
+    ESPConnections = {}
+
+    -- Disconnect all Skeleton ESP connections
+    for connectionKey, connection in pairs(SkeletonESPConnections) do
+        if connection and connection.Disconnect then
+            pcall(function() connection:Disconnect() end)
+        end
+    end
+    SkeletonESPConnections = {}
+
+    -- Disconnect all Off-Screen Arrow connections
+    for playerName, connection in pairs(OffScreenArrowConnections) do
+        if connection and connection.Disconnect then
+            pcall(function() connection:Disconnect() end)
+        end
+    end
+    OffScreenArrowConnections = {}
+
+    -- Clean up Off-Screen Arrow objects
+    for playerName, arrow in pairs(OffScreenArrowObjects) do
+        if arrow and arrow.Remove then
+            pcall(function() arrow:Remove() end)
+        end
+    end
+    OffScreenArrowObjects = {}
+
+    -- Clean up Radar objects
+    for key, obj in pairs(RadarObjects) do
+        if obj and obj.Remove then
+            pcall(function() obj:Remove() end)
+        end
+    end
+    RadarObjects = {}
+
+    -- Disconnect Radar connections
+    for key, connection in pairs(RadarConnections) do
+        if connection and connection.Disconnect then
+            pcall(function() connection:Disconnect() end)
+        end
+    end
+    RadarConnections = {}
+
+    -- Clean up ESP objects
+    for playerName, espLib in pairs(ESPObjects) do
+        for _, obj in pairs(espLib) do
+            if obj and obj.Remove then
+                pcall(function() obj:Remove() end)
+            end
+        end
+    end
+    ESPObjects = {}
+
+    -- Clean up Skeleton ESP objects
+    for playerName, skelLib in pairs(SkeletonESPObjects) do
+        for _, obj in pairs(skelLib) do
+            if obj and obj.Remove then
+                pcall(function() obj:Remove() end)
+            end
+        end
+    end
+    SkeletonESPObjects = {}
+end
+
 -- ESP UI Controls
 local ESPGroup = Tabs.ESP:AddLeftGroupbox("ESP Settings", "eye")
 
@@ -2049,6 +2120,8 @@ ESPGroup:AddToggle("ESPEnabled", {
                 Time = 2,
             })
         else
+            -- Clean up ESP objects and connections when disabled
+            CleanupESP()
             Library:Notify({
                 Title = "ESP Disabled",
                 Description = "All ESP features are now inactive",
@@ -2305,8 +2378,8 @@ ESPGroup:AddToggle("ESPChams", {
 
                                 -- Create highlight for the character
                                 local highlight = Instance.new("Highlight")
-                                highlight.FillColor = ESPSettings.TeamCheck and 
-                                    (plr.TeamColor == player.TeamColor and ESPSettings.Green or ESPSettings.Red) or 
+                                highlight.FillColor = ESPSettings.TeamCheck and
+                                    (plr.TeamColor == player.TeamColor and ESPSettings.Green or ESPSettings.Red) or
                                     (ESPSettings.TeamColor and plr.TeamColor.Color or Color3.fromRGB(255, 0, 0))
                                 highlight.OutlineColor = Color3.fromRGB(0, 0, 0)
                                 highlight.FillTransparency = 0.5
@@ -2319,8 +2392,8 @@ ESPGroup:AddToggle("ESPChams", {
                                 -- Update existing highlight
                                 local highlight = getgenv().ChamsObjects[plr.Name].Highlight
                                 if highlight and highlight.Parent then
-                                    highlight.FillColor = ESPSettings.TeamCheck and 
-                                        (plr.TeamColor == player.TeamColor and ESPSettings.Green or ESPSettings.Red) or 
+                                    highlight.FillColor = ESPSettings.TeamCheck and
+                                        (plr.TeamColor == player.TeamColor and ESPSettings.Green or ESPSettings.Red) or
                                         (ESPSettings.TeamColor and plr.TeamColor.Color or Color3.fromRGB(255, 0, 0))
                                     highlight.Adornee = plr.Character
                                 end
@@ -2939,79 +3012,14 @@ end)
     -- Disable ESP settings to stop render loops
     ESPSettings.Enabled = false
 
-    -- Disconnect all ESP connections
-    for playerName, connection in pairs(ESPConnections) do
-        if connection and connection.Disconnect then
-            pcall(function() connection:Disconnect() end)
-        end
-    end
-    ESPConnections = {}
-
-    -- Disconnect all Skeleton ESP connections
-    for connectionKey, connection in pairs(SkeletonESPConnections) do
-        if connection and connection.Disconnect then
-            pcall(function() connection:Disconnect() end)
-        end
-    end
-    SkeletonESPConnections = {}
-
-    -- Disconnect all Off-Screen Arrow connections (Made by Blissful#4992)
-    for playerName, connection in pairs(OffScreenArrowConnections) do
-        if connection and connection.Disconnect then
-            pcall(function() connection:Disconnect() end)
-        end
-    end
-    OffScreenArrowConnections = {}
-
-    -- Clean up Off-Screen Arrow objects (Made by Blissful#4992)
-    for playerName, arrow in pairs(OffScreenArrowObjects) do
-        if arrow and arrow.Remove then
-            pcall(function() arrow:Remove() end)
-        end
-    end
-    OffScreenArrowObjects = {}
-
-    -- Clean up Radar objects (Made by Blissful#4992)
-    for key, obj in pairs(RadarObjects) do
-        if obj and obj.Remove then
-            pcall(function() obj:Remove() end)
-        end
-    end
-    RadarObjects = {}
-
-    -- Disconnect Radar connections (Made by Blissful#4992)
-    for key, connection in pairs(RadarConnections) do
-        if connection and connection.Disconnect then
-            pcall(function() connection:Disconnect() end)
-        end
-    end
-    RadarConnections = {}
+    -- Use the CleanupESP function to clean up all ESP-related objects and connections
+    CleanupESP()
 
     -- Disconnect PlayerAdded connection
     if PlayerAddedConnection and PlayerAddedConnection.Disconnect then
         pcall(function() PlayerAddedConnection:Disconnect() end)
         PlayerAddedConnection = nil
     end
-
-    -- Clean up ESP objects
-    for playerName, espLib in pairs(ESPObjects) do
-        for _, obj in pairs(espLib) do
-            if obj and obj.Remove then
-                pcall(function() obj:Remove() end)
-            end
-        end
-    end
-    ESPObjects = {}
-
-    -- Clean up Skeleton ESP objects
-    for playerName, skelLib in pairs(SkeletonESPObjects) do
-        for _, obj in pairs(skelLib) do
-            if obj and obj.Remove then
-                pcall(function() obj:Remove() end)
-            end
-        end
-    end
-    SkeletonESPObjects = {}
 
     -- Make sure the aimbot is disabled by setting its Enabled property to false
     if getgenv().ExunysDeveloperAimbot and getgenv().ExunysDeveloperAimbot.Settings then
@@ -3273,7 +3281,7 @@ LowGraphicsGroup:AddToggle("LowGraphics", {
 
             -- Apply low graphics (change all parts to SmoothPlastic)
             for i, v in pairs(workspace:GetDescendants()) do
-                if v:IsA("Part") then 
+                if v:IsA("Part") then
                     v.Material = Enum.Material.SmoothPlastic
                 end
             end
