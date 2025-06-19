@@ -61,21 +61,118 @@ AimbotGroup:AddToggle("AimbotEnabled", {
     end,
 })
 
+-- Enhanced target part selection with multiple options
 AimbotGroup:AddDropdown("LockPart", {
-    Values = { "Head", "Torso", "HumanoidRootPart", "UpperTorso", "LowerTorso" },
+    Values = { "Head", "Torso", "HumanoidRootPart", "UpperTorso", "LowerTorso", "Random", "Smart", "Cycle" },
     Default = AimbotModule.Settings.LockPart,
     Text = "Lock Part",
+    Tooltip = "Smart: Head for stationary, HRP for moving targets\nCycle: Cycles through parts\nRandom: Random part each lock",
     Callback = function(Value)
         AimbotModule.Settings.LockPart = Value
+
+        -- Setup for cycling parts if that option is selected
+        if Value == "Cycle" then
+            if not getgenv().CycleParts then
+                getgenv().CycleParts = { "Head", "Torso", "HumanoidRootPart", "UpperTorso", "LowerTorso" }
+                getgenv().CurrentCycleIndex = 1
+
+                -- Create a function to cycle parts on each shot
+                if not getgenv().CyclePartsFunction then
+                    getgenv().CyclePartsFunction = function()
+                        getgenv().CurrentCycleIndex = (getgenv().CurrentCycleIndex % #getgenv().CycleParts) + 1
+                        local nextPart = getgenv().CycleParts[getgenv().CurrentCycleIndex]
+                        AimbotModule.Settings.LockPart = nextPart
+                        Library:Notify({
+                            Title = "Part Cycled",
+                            Description = "Now targeting: " .. nextPart,
+                            Time = 1,
+                        })
+                    end
+                end
+            end
+        end
+
+        -- Setup for random part selection
+        if Value == "Random" then
+            if not getgenv().RandomPartFunction then
+                getgenv().RandomParts = { "Head", "Torso", "HumanoidRootPart", "UpperTorso", "LowerTorso" }
+                getgenv().RandomPartFunction = function()
+                    local randomIndex = math.random(1, #getgenv().RandomParts)
+                    local randomPart = getgenv().RandomParts[randomIndex]
+                    AimbotModule.Settings.LockPart = randomPart
+                    Library:Notify({
+                        Title = "Random Part",
+                        Description = "Now targeting: " .. randomPart,
+                        Time = 1,
+                    })
+                end
+            end
+        end
+
+        -- Setup for smart targeting
+        if Value == "Smart" then
+            if not getgenv().SmartTargetFunction then
+                getgenv().SmartTargetFunction = function(target)
+                    if target and target.Character then
+                        local humanoid = target.Character:FindFirstChildOfClass("Humanoid")
+                        if humanoid and humanoid.MoveDirection.Magnitude > 0.1 then
+                            AimbotModule.Settings.LockPart = "HumanoidRootPart" -- Moving target, aim for center mass
+                        else
+                            AimbotModule.Settings.LockPart = "Head" -- Stationary target, aim for head
+                        end
+                    end
+                end
+            end
+        end
     end,
 })
 
 AimbotGroup:AddDropdown("LockMode", {
-    Values = { "CFrame", "mousemoverel" },
+    Values = { "CFrame", "mousemoverel", "Camera", "Hybrid" },
     Default = AimbotModule.Settings.LockMode == 1 and "CFrame" or "mousemoverel",
     Text = "Lock Mode",
+    Tooltip = "CFrame: Instant lock (may be detected)\nMousemoverel: Mouse movement (more legit)\nCamera: Camera manipulation\nHybrid: Combines methods",
     Callback = function(Value)
-        AimbotModule.Settings.LockMode = Value == "CFrame" and 1 or 2
+        if Value == "CFrame" then
+            AimbotModule.Settings.LockMode = 1
+        elseif Value == "mousemoverel" then
+            AimbotModule.Settings.LockMode = 2
+        elseif Value == "Camera" then
+            AimbotModule.Settings.LockMode = 3
+            -- Add camera manipulation mode
+            if not getgenv().CameraManipulation then
+                getgenv().CameraManipulation = function(target, part)
+                    if workspace.CurrentCamera and target and target.Character and target.Character:FindFirstChild(part) then
+                        workspace.CurrentCamera.CFrame = CFrame.new(
+                            workspace.CurrentCamera.CFrame.Position,
+                            target.Character[part].Position
+                        )
+                    end
+                end
+            end
+        elseif Value == "Hybrid" then
+            AimbotModule.Settings.LockMode = 4
+            -- Hybrid mode combines mousemoverel with subtle camera adjustments
+            if not getgenv().HybridAiming then
+                getgenv().HybridAiming = function(target, part, sensitivity)
+                    if target and target.Character and target.Character:FindFirstChild(part) then
+                        -- Use mousemoverel for main movement
+                        local targetPos = target.Character[part].Position
+                        local camera = workspace.CurrentCamera
+                        local mousePos = camera:WorldToScreenPoint(targetPos)
+                        local mouseX = mousePos.X - camera.ViewportSize.X/2
+                        local mouseY = mousePos.Y - camera.ViewportSize.Y/2
+                        mousemoverel(mouseX * sensitivity, mouseY * sensitivity)
+
+                        -- Subtle camera adjustment
+                        camera.CFrame = camera.CFrame:Lerp(
+                            CFrame.new(camera.CFrame.Position, targetPos),
+                            0.2 -- Subtle adjustment factor
+                        )
+                    end
+                end
+            end
+        end
     end,
 })
 
@@ -84,7 +181,7 @@ AimbotGroup:AddSlider("Sensitivity", {
     Default = AimbotModule.Settings.Sensitivity,
     Min = 0,
     Max = 5,
-    Rounding = 1,
+    Rounding = 2,
     Callback = function(Value)
         AimbotModule.Settings.Sensitivity = Value
     end,
@@ -95,9 +192,35 @@ AimbotGroup:AddSlider("Sensitivity2", {
     Default = AimbotModule.Settings.Sensitivity2,
     Min = 0.1,
     Max = 10,
-    Rounding = 1,
+    Rounding = 2,
     Callback = function(Value)
         AimbotModule.Settings.Sensitivity2 = Value
+    end,
+})
+
+-- Add smoothness control for more human-like aiming
+AimbotGroup:AddSlider("Smoothness", {
+    Text = "Smoothness",
+    Default = AimbotModule.Settings.Smoothness or 0.5,
+    Min = 0,
+    Max = 1,
+    Rounding = 2,
+    Tooltip = "Higher = smoother but slower aiming (more human-like)",
+    Callback = function(Value)
+        AimbotModule.Settings.Smoothness = Value
+    end,
+})
+
+-- Add aim assist strength for subtle help rather than full lock
+AimbotGroup:AddSlider("AimAssistStrength", {
+    Text = "Aim Assist Strength",
+    Default = AimbotModule.Settings.AimAssistStrength or 1,
+    Min = 0,
+    Max = 1,
+    Rounding = 2,
+    Tooltip = "1 = Full aimbot, lower values provide subtle aim assist",
+    Callback = function(Value)
+        AimbotModule.Settings.AimAssistStrength = Value
     end,
 })
 
@@ -125,6 +248,60 @@ ChecksGroup:AddToggle("WallCheck", {
     Default = AimbotModule.Settings.WallCheck,
     Callback = function(Value)
         AimbotModule.Settings.WallCheck = Value
+    end,
+})
+
+-- Add visibility check (checks if target is visible on screen)
+ChecksGroup:AddToggle("VisibilityCheck", {
+    Text = "Visibility Check",
+    Default = AimbotModule.Settings.VisibilityCheck or false,
+    Tooltip = "Only target players visible on screen",
+    Callback = function(Value)
+        AimbotModule.Settings.VisibilityCheck = Value
+    end,
+})
+
+-- Add distance check with configurable max distance
+ChecksGroup:AddToggle("DistanceCheck", {
+    Text = "Distance Check",
+    Default = AimbotModule.Settings.DistanceCheck or false,
+    Tooltip = "Only target players within specified distance",
+    Callback = function(Value)
+        AimbotModule.Settings.DistanceCheck = Value
+    end,
+})
+
+ChecksGroup:AddSlider("MaxDistance", {
+    Text = "Max Distance",
+    Default = AimbotModule.Settings.MaxDistance or 1000,
+    Min = 10,
+    Max = 2000,
+    Rounding = 0,
+    Tooltip = "Maximum distance to target players",
+    Callback = function(Value)
+        AimbotModule.Settings.MaxDistance = Value
+    end,
+})
+
+-- Add health check with configurable min health
+ChecksGroup:AddToggle("HealthCheck", {
+    Text = "Health Check",
+    Default = AimbotModule.Settings.HealthCheck or false,
+    Tooltip = "Only target players with health above threshold",
+    Callback = function(Value)
+        AimbotModule.Settings.HealthCheck = Value
+    end,
+})
+
+ChecksGroup:AddSlider("MinHealth", {
+    Text = "Min Health %",
+    Default = AimbotModule.Settings.MinHealth or 0,
+    Min = 0,
+    Max = 100,
+    Rounding = 0,
+    Tooltip = "Minimum health percentage to target players",
+    Callback = function(Value)
+        AimbotModule.Settings.MinHealth = Value
     end,
 })
 
@@ -166,11 +343,230 @@ local TriggerKeyPicker = ToggleModeToggle:AddKeyPicker("TriggerKey", {
     end,
 })
 
--- Offset Settings
-local OffsetGroup = Tabs.Aimbot:AddLeftGroupbox("Offset Settings", "move")
+-- Add a secondary keybind for toggling silent aim
+local SilentAimToggle = ChecksGroup:AddToggle("SilentAim", {
+    Text = "Silent Aim",
+    Default = AimbotModule.Settings.SilentAim or false,
+    Tooltip = "Aim without moving your camera (harder to detect)",
+    Callback = function(Value)
+        AimbotModule.Settings.SilentAim = Value
 
-OffsetGroup:AddToggle("OffsetToMoveDirection", {
-    Text = "Offset to Move Direction",
+        -- Initialize silent aim if enabled
+        if Value then
+            if not getgenv().SilentAimInitialized then
+                getgenv().SilentAimInitialized = true
+
+                -- Create silent aim hook function
+                getgenv().SilentAimHook = function()
+                    local oldNamecall
+                    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+                        local args = {...}
+                        local method = getnamecallmethod()
+
+                        -- Check if it's a relevant firing method
+                        if (method == "FireServer" or method == "InvokeServer") and 
+                           (self.Name == "RemoteEvent" or self.Name:lower():find("fire") or self.Name:lower():find("shoot")) and
+                           AimbotModule.Settings.SilentAim and
+                           AimbotModule.Settings.Enabled then
+
+                            -- Get closest player
+                            local target = AimbotModule.GetClosestPlayer()
+                            if target and target.Character then
+                                local targetPart = target.Character:FindFirstChild(AimbotModule.Settings.LockPart)
+                                if targetPart then
+                                    -- Modify arguments to hit the target
+                                    -- This is a generic implementation and may need game-specific adjustments
+                                    for i, v in pairs(args) do
+                                        if typeof(v) == "Vector3" then
+                                            args[i] = targetPart.Position
+                                        elseif typeof(v) == "CFrame" then
+                                            args[i] = CFrame.new(v.Position, targetPart.Position)
+                                        end
+                                    end
+                                end
+                            end
+                        end
+
+                        return oldNamecall(self, unpack(args))
+                    end)
+                end
+
+                -- Run the hook
+                pcall(getgenv().SilentAimHook)
+            end
+        end
+    end,
+})
+
+-- Advanced Targeting Group
+local TargetingGroup = Tabs.Aimbot:AddLeftGroupbox("Advanced Targeting", "crosshair")
+
+-- Target priority system
+TargetingGroup:AddDropdown("TargetPriority", {
+    Values = { "Closest", "Health", "Threat", "Random" },
+    Default = AimbotModule.Settings.TargetPriority or "Closest",
+    Text = "Target Priority",
+    Tooltip = "How to prioritize targets:\nClosest: Target closest player\nHealth: Target lowest health\nThreat: Target player dealing most damage\nRandom: Target random player",
+    Callback = function(Value)
+        AimbotModule.Settings.TargetPriority = Value
+
+        -- Initialize target priority system
+        if not getgenv().TargetPriorityInitialized then
+            getgenv().TargetPriorityInitialized = true
+
+            -- Override GetClosestPlayer to use priority system
+            local originalGetClosestPlayer = AimbotModule.GetClosestPlayer
+            AimbotModule.GetClosestPlayer = function()
+                local priority = AimbotModule.Settings.TargetPriority
+
+                if priority == "Closest" then
+                    -- Use original function for closest player
+                    return originalGetClosestPlayer()
+
+                elseif priority == "Health" then
+                    -- Target player with lowest health
+                    local lowestHealth = math.huge
+                    local targetPlayer = nil
+
+                    for _, plr in pairs(game:GetService("Players"):GetPlayers()) do
+                        if plr ~= game:GetService("Players").LocalPlayer and plr.Character and plr.Character:FindFirstChild("Humanoid") then
+                            local humanoid = plr.Character:FindFirstChildOfClass("Humanoid")
+                            if humanoid and humanoid.Health > 0 and humanoid.Health < lowestHealth then
+                                -- Apply all the standard checks
+                                local isTeammate = AimbotModule.Settings.TeamCheck and plr.Team == game:GetService("Players").LocalPlayer.Team
+                                local isBlockedByWall = false
+
+                                if AimbotModule.Settings.WallCheck then
+                                    local ray = Ray.new(
+                                        game:GetService("Workspace").CurrentCamera.CFrame.Position,
+                                        (plr.Character.HumanoidRootPart.Position - game:GetService("Workspace").CurrentCamera.CFrame.Position).Unit * 1000
+                                    )
+                                    local hit, _ = game:GetService("Workspace"):FindPartOnRayWithIgnoreList(ray, {game:GetService("Players").LocalPlayer.Character})
+                                    isBlockedByWall = hit and hit:IsDescendantOf(plr.Character) == false
+                                end
+
+                                if not isTeammate and not isBlockedByWall then
+                                    lowestHealth = humanoid.Health
+                                    targetPlayer = plr
+                                end
+                            end
+                        end
+                    end
+
+                    return targetPlayer
+
+                elseif priority == "Threat" then
+                    -- Target player who dealt most damage to you
+                    -- This requires tracking damage, which we'll simulate with a threat score
+                    if not getgenv().ThreatScores then
+                        getgenv().ThreatScores = {}
+
+                        -- Simulate threat by distance and facing direction
+                        for _, plr in pairs(game:GetService("Players"):GetPlayers()) do
+                            if plr ~= game:GetService("Players").LocalPlayer and plr.Character then
+                                local distance = (plr.Character.HumanoidRootPart.Position - game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                                local facing = plr.Character.HumanoidRootPart.CFrame.LookVector:Dot((game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.Position - plr.Character.HumanoidRootPart.Position).Unit)
+
+                                -- Higher threat if close and facing you
+                                getgenv().ThreatScores[plr.Name] = (1000 / math.max(distance, 1)) * (facing + 1)
+                            end
+                        end
+                    end
+
+                    -- Find highest threat player
+                    local highestThreat = 0
+                    local targetPlayer = nil
+
+                    for _, plr in pairs(game:GetService("Players"):GetPlayers()) do
+                        if plr ~= game:GetService("Players").LocalPlayer and plr.Character and getgenv().ThreatScores[plr.Name] then
+                            local threatScore = getgenv().ThreatScores[plr.Name]
+
+                            -- Apply all the standard checks
+                            local isTeammate = AimbotModule.Settings.TeamCheck and plr.Team == game:GetService("Players").LocalPlayer.Team
+                            local isBlockedByWall = false
+
+                            if AimbotModule.Settings.WallCheck then
+                                local ray = Ray.new(
+                                    game:GetService("Workspace").CurrentCamera.CFrame.Position,
+                                    (plr.Character.HumanoidRootPart.Position - game:GetService("Workspace").CurrentCamera.CFrame.Position).Unit * 1000
+                                )
+                                local hit, _ = game:GetService("Workspace"):FindPartOnRayWithIgnoreList(ray, {game:GetService("Players").LocalPlayer.Character})
+                                isBlockedByWall = hit and hit:IsDescendantOf(plr.Character) == false
+                            end
+
+                            if not isTeammate and not isBlockedByWall and threatScore > highestThreat then
+                                highestThreat = threatScore
+                                targetPlayer = plr
+                            end
+                        end
+                    end
+
+                    return targetPlayer
+
+                elseif priority == "Random" then
+                    -- Target random player
+                    local validTargets = {}
+
+                    for _, plr in pairs(game:GetService("Players"):GetPlayers()) do
+                        if plr ~= game:GetService("Players").LocalPlayer and plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
+                            -- Apply all the standard checks
+                            local isTeammate = AimbotModule.Settings.TeamCheck and plr.Team == game:GetService("Players").LocalPlayer.Team
+                            local isBlockedByWall = false
+
+                            if AimbotModule.Settings.WallCheck then
+                                local ray = Ray.new(
+                                    game:GetService("Workspace").CurrentCamera.CFrame.Position,
+                                    (plr.Character.HumanoidRootPart.Position - game:GetService("Workspace").CurrentCamera.CFrame.Position).Unit * 1000
+                                )
+                                local hit, _ = game:GetService("Workspace"):FindPartOnRayWithIgnoreList(ray, {game:GetService("Players").LocalPlayer.Character})
+                                isBlockedByWall = hit and hit:IsDescendantOf(plr.Character) == false
+                            end
+
+                            if not isTeammate and not isBlockedByWall then
+                                table.insert(validTargets, plr)
+                            end
+                        end
+                    end
+
+                    if #validTargets > 0 then
+                        return validTargets[math.random(1, #validTargets)]
+                    end
+                end
+
+                -- Fallback to original function
+                return originalGetClosestPlayer()
+            end
+        end
+    end,
+})
+
+-- Target switching settings
+TargetingGroup:AddToggle("AutoSwitch", {
+    Text = "Auto Switch Target",
+    Default = AimbotModule.Settings.AutoSwitch or false,
+    Tooltip = "Automatically switch to better targets",
+    Callback = function(Value)
+        AimbotModule.Settings.AutoSwitch = Value
+    end,
+})
+
+TargetingGroup:AddSlider("SwitchDelay", {
+    Text = "Switch Delay (ms)",
+    Default = AimbotModule.Settings.SwitchDelay or 500,
+    Min = 0,
+    Max = 2000,
+    Rounding = 0,
+    Tooltip = "Delay between target switches",
+    Callback = function(Value)
+        AimbotModule.Settings.SwitchDelay = Value
+    end,
+})
+
+-- Enhanced Prediction Settings
+local PredictionGroup = Tabs.Aimbot:AddRightGroupbox("Prediction Settings", "move")
+
+PredictionGroup:AddToggle("EnablePrediction", {
+    Text = "Enable Prediction",
     Default = AimbotModule.Settings.OffsetToMoveDirection,
     Tooltip = "Predict player movement",
     Callback = function(Value)
@@ -178,14 +574,317 @@ OffsetGroup:AddToggle("OffsetToMoveDirection", {
     end,
 })
 
-OffsetGroup:AddSlider("OffsetIncrement", {
-    Text = "Offset Increment",
+PredictionGroup:AddDropdown("PredictionMethod", {
+    Values = { "Basic", "Velocity", "Advanced", "Adaptive" },
+    Default = AimbotModule.Settings.PredictionMethod or "Basic",
+    Text = "Prediction Method",
+    Tooltip = "Basic: Simple direction prediction\nVelocity: Uses velocity for prediction\nAdvanced: Accounts for acceleration\nAdaptive: Learns player movement patterns",
+    Callback = function(Value)
+        AimbotModule.Settings.PredictionMethod = Value
+
+        -- Initialize prediction system
+        if not getgenv().PredictionInitialized then
+            getgenv().PredictionInitialized = true
+
+            -- Store previous positions for velocity calculation
+            getgenv().PreviousPositions = {}
+            getgenv().PreviousVelocities = {}
+
+            -- Update positions and velocities
+            game:GetService("RunService").Heartbeat:Connect(function()
+                for _, plr in pairs(game:GetService("Players"):GetPlayers()) do
+                    if plr ~= game:GetService("Players").LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                        local currentPos = plr.Character.HumanoidRootPart.Position
+
+                        if not getgenv().PreviousPositions[plr.Name] then
+                            getgenv().PreviousPositions[plr.Name] = currentPos
+                            getgenv().PreviousVelocities[plr.Name] = Vector3.new(0, 0, 0)
+                        else
+                            local previousPos = getgenv().PreviousPositions[plr.Name]
+                            local velocity = (currentPos - previousPos) / game:GetService("RunService").Heartbeat:Wait()
+
+                            -- Store previous velocity for acceleration calculation
+                            local previousVelocity = getgenv().PreviousVelocities[plr.Name]
+                            getgenv().PreviousVelocities[plr.Name] = velocity
+
+                            -- Update position
+                            getgenv().PreviousPositions[plr.Name] = currentPos
+
+                            -- Store acceleration
+                            if not getgenv().Accelerations then getgenv().Accelerations = {} end
+                            getgenv().Accelerations[plr.Name] = (velocity - previousVelocity) / game:GetService("RunService").Heartbeat:Wait()
+
+                            -- For adaptive prediction, store movement patterns
+                            if AimbotModule.Settings.PredictionMethod == "Adaptive" then
+                                if not getgenv().MovementPatterns then getgenv().MovementPatterns = {} end
+                                if not getgenv().MovementPatterns[plr.Name] then getgenv().MovementPatterns[plr.Name] = {} end
+
+                                table.insert(getgenv().MovementPatterns[plr.Name], velocity)
+                                if #getgenv().MovementPatterns[plr.Name] > 30 then -- Store last 30 velocity samples
+                                    table.remove(getgenv().MovementPatterns[plr.Name], 1)
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+
+            -- Override the prediction function
+            getgenv().GetPredictedPosition = function(player, part)
+                if not player or not player.Character or not player.Character:FindFirstChild(part) then
+                    return nil
+                end
+
+                local targetPart = player.Character[part]
+                local currentPos = targetPart.Position
+                local method = AimbotModule.Settings.PredictionMethod
+
+                if method == "Basic" then
+                    -- Basic prediction using move direction
+                    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+                    if humanoid then
+                        return currentPos + (humanoid.MoveDirection * AimbotModule.Settings.OffsetIncrement)
+                    end
+
+                elseif method == "Velocity" then
+                    -- Velocity-based prediction
+                    if getgenv().PreviousVelocities[player.Name] then
+                        local velocity = getgenv().PreviousVelocities[player.Name]
+                        local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() / 1000
+                        return currentPos + (velocity * ping * AimbotModule.Settings.OffsetIncrement / 10)
+                    end
+
+                elseif method == "Advanced" then
+                    -- Advanced prediction with acceleration
+                    if getgenv().PreviousVelocities[player.Name] and getgenv().Accelerations[player.Name] then
+                        local velocity = getgenv().PreviousVelocities[player.Name]
+                        local acceleration = getgenv().Accelerations[player.Name]
+                        local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() / 1000
+
+                        -- Physics formula: position = initial_position + velocity*time + 0.5*acceleration*time^2
+                        return currentPos + (velocity * ping) + (0.5 * acceleration * ping * ping) * (AimbotModule.Settings.OffsetIncrement / 10)
+                    end
+
+                elseif method == "Adaptive" then
+                    -- Adaptive prediction based on movement patterns
+                    if getgenv().MovementPatterns and getgenv().MovementPatterns[player.Name] and #getgenv().MovementPatterns[player.Name] > 5 then
+                        local patterns = getgenv().MovementPatterns[player.Name]
+                        local predictedVelocity = Vector3.new(0, 0, 0)
+
+                        -- Calculate weighted average of recent velocities
+                        local totalWeight = 0
+                        for i = 1, #patterns do
+                            local weight = i / #patterns -- More recent velocities have higher weight
+                            predictedVelocity = predictedVelocity + (patterns[i] * weight)
+                            totalWeight = totalWeight + weight
+                        end
+
+                        predictedVelocity = predictedVelocity / totalWeight
+                        local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() / 1000
+
+                        return currentPos + (predictedVelocity * ping * AimbotModule.Settings.OffsetIncrement / 10)
+                    end
+                end
+
+                -- Fallback to current position
+                return currentPos
+            end
+        end
+    end,
+})
+
+PredictionGroup:AddSlider("PredictionStrength", {
+    Text = "Prediction Strength",
     Default = AimbotModule.Settings.OffsetIncrement,
     Min = 1,
     Max = 30,
-    Rounding = 0,
+    Rounding = 1,
     Callback = function(Value)
         AimbotModule.Settings.OffsetIncrement = Value
+    end,
+})
+
+-- Add ping compensation
+PredictionGroup:AddToggle("PingCompensation", {
+    Text = "Ping Compensation",
+    Default = AimbotModule.Settings.PingCompensation or false,
+    Tooltip = "Adjust prediction based on your ping",
+    Callback = function(Value)
+        AimbotModule.Settings.PingCompensation = Value
+    end,
+})
+
+-- Add silent aim feature
+local SilentAimGroup = Tabs.Aimbot:AddRightGroupbox("Silent Aim", "eye-off")
+
+SilentAimGroup:AddToggle("SilentAimEnabled", {
+    Text = "Enable Silent Aim",
+    Default = AimbotModule.Settings.SilentAim or false,
+    Tooltip = "Aim without moving your camera (harder to detect)",
+    Callback = function(Value)
+        AimbotModule.Settings.SilentAim = Value
+
+        -- Initialize silent aim if enabled
+        if Value and not getgenv().SilentAimInitialized then
+            getgenv().SilentAimInitialized = true
+
+            -- Create silent aim hook function
+            getgenv().SilentAimHook = function()
+                local oldNamecall
+                oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+                    local args = {...}
+                    local method = getnamecallmethod()
+
+                    -- Check if it's a relevant firing method
+                    if (method == "FireServer" or method == "InvokeServer") and 
+                       (self.Name == "RemoteEvent" or self.Name:lower():find("fire") or self.Name:lower():find("shoot")) and
+                       AimbotModule.Settings.SilentAim and
+                       AimbotModule.Settings.Enabled then
+
+                        -- Get closest player
+                        local target = AimbotModule.GetClosestPlayer()
+                        if target and target.Character then
+                            local targetPart = target.Character:FindFirstChild(AimbotModule.Settings.LockPart)
+                            if targetPart then
+                                -- Modify arguments to hit the target
+                                -- This is a generic implementation and may need game-specific adjustments
+                                for i, v in pairs(args) do
+                                    if typeof(v) == "Vector3" then
+                                        args[i] = targetPart.Position
+                                    elseif typeof(v) == "CFrame" then
+                                        args[i] = CFrame.new(v.Position, targetPart.Position)
+                                    end
+                                end
+                            end
+                        end
+                    end
+
+                    return oldNamecall(self, unpack(args))
+                end)
+            end
+
+            -- Run the hook
+            pcall(getgenv().SilentAimHook)
+        end
+    end,
+})
+
+SilentAimGroup:AddSlider("SilentAimFOV", {
+    Text = "Silent Aim FOV",
+    Default = AimbotModule.Settings.SilentAimFOV or 100,
+    Min = 10,
+    Max = 500,
+    Rounding = 0,
+    Tooltip = "Field of view for silent aim",
+    Callback = function(Value)
+        AimbotModule.Settings.SilentAimFOV = Value
+    end,
+})
+
+SilentAimGroup:AddToggle("SilentAimVisibleCheck", {
+    Text = "Visible Check",
+    Default = AimbotModule.Settings.SilentAimVisibleCheck or true,
+    Tooltip = "Only target visible players",
+    Callback = function(Value)
+        AimbotModule.Settings.SilentAimVisibleCheck = Value
+    end,
+})
+
+SilentAimGroup:AddSlider("SilentAimHitChance", {
+    Text = "Hit Chance (%)",
+    Default = AimbotModule.Settings.SilentAimHitChance or 100,
+    Min = 0,
+    Max = 100,
+    Rounding = 0,
+    Tooltip = "Chance to hit the target (lower = more legit)",
+    Callback = function(Value)
+        AimbotModule.Settings.SilentAimHitChance = Value
+    end,
+})
+
+-- Add anti-detection features
+local AntiDetectionGroup = Tabs.Aimbot:AddLeftGroupbox("Anti-Detection", "shield")
+
+AntiDetectionGroup:AddToggle("RandomizeAim", {
+    Text = "Randomize Aim",
+    Default = AimbotModule.Settings.RandomizeAim or false,
+    Tooltip = "Add slight randomness to aim for human-like behavior",
+    Callback = function(Value)
+        AimbotModule.Settings.RandomizeAim = Value
+    end,
+})
+
+AntiDetectionGroup:AddSlider("RandomizationAmount", {
+    Text = "Randomization",
+    Default = AimbotModule.Settings.RandomizationAmount or 5,
+    Min = 0,
+    Max = 20,
+    Rounding = 1,
+    Tooltip = "Amount of randomization to add",
+    Callback = function(Value)
+        AimbotModule.Settings.RandomizationAmount = Value
+    end,
+})
+
+AntiDetectionGroup:AddToggle("HumanizeAim", {
+    Text = "Humanize Aim",
+    Default = AimbotModule.Settings.HumanizeAim or false,
+    Tooltip = "Simulate human aiming patterns",
+    Callback = function(Value)
+        AimbotModule.Settings.HumanizeAim = Value
+
+        -- Initialize humanization system
+        if Value and not getgenv().HumanizationInitialized then
+            getgenv().HumanizationInitialized = true
+
+            -- Create humanization function
+            getgenv().HumanizeAimPosition = function(targetPosition)
+                if not AimbotModule.Settings.HumanizeAim then
+                    return targetPosition
+                end
+
+                -- Add slight curve to aim path
+                local camera = game:GetService("Workspace").CurrentCamera
+                local cameraPos = camera.CFrame.Position
+                local aimDir = (targetPosition - cameraPos).Unit
+
+                -- Create a slight curve by adding perpendicular vector
+                local upVector = Vector3.new(0, 1, 0)
+                local rightVector = aimDir:Cross(upVector).Unit
+                local upwardVector = rightVector:Cross(aimDir).Unit
+
+                -- Oscillate the aim with a sine wave
+                local time = tick() % (math.pi * 2)
+                local curveX = math.sin(time * 2) * AimbotModule.Settings.RandomizationAmount * 0.1
+                local curveY = math.cos(time * 2) * AimbotModule.Settings.RandomizationAmount * 0.1
+
+                -- Apply the curve
+                local curvedPosition = targetPosition + (rightVector * curveX) + (upwardVector * curveY)
+
+                return curvedPosition
+            end
+        end
+    end,
+})
+
+AntiDetectionGroup:AddToggle("DelayedAim", {
+    Text = "Delayed Aim",
+    Default = AimbotModule.Settings.DelayedAim or false,
+    Tooltip = "Add reaction time delay before aiming",
+    Callback = function(Value)
+        AimbotModule.Settings.DelayedAim = Value
+    end,
+})
+
+AntiDetectionGroup:AddSlider("ReactionTime", {
+    Text = "Reaction Time (ms)",
+    Default = AimbotModule.Settings.ReactionTime or 150,
+    Min = 0,
+    Max = 500,
+    Rounding = 0,
+    Tooltip = "Simulated human reaction time",
+    Callback = function(Value)
+        AimbotModule.Settings.ReactionTime = Value
     end,
 })
 
@@ -1359,6 +2058,138 @@ ESPGroup:AddToggle("ESPEnabled", {
     end,
 })
 
+-- Create a dropdown for ESP presets
+ESPGroup:AddDropdown("ESPPreset", {
+    Values = { "Default", "Competitive", "Stealth", "Colorful", "Minimal", "Custom" },
+    Default = "Default",
+    Text = "ESP Preset",
+    Tooltip = "Quick presets for different ESP styles",
+    Disabled = not DrawingAvailable,
+    Callback = function(Value)
+        if Value == "Default" then
+            -- Default settings
+            ESPSettings.Boxes = true
+            ESPSettings.Tracers = true
+            ESPSettings.HealthBars = true
+            ESPSettings.Skeletons = false
+            ESPSettings.OffScreenArrows = false
+            ESPSettings.Names = false
+            ESPSettings.Distances = false
+            ESPSettings.Weapons = false
+            ESPSettings.Chams = false
+            ESPSettings.Box_Thickness = 1
+            ESPSettings.Tracer_Thickness = 1
+            ESPSettings.Skeleton_Thickness = 1
+            ESPSettings.Box_Color = Color3.fromRGB(255, 0, 0)
+            ESPSettings.Tracer_Color = Color3.fromRGB(255, 0, 0)
+            ESPSettings.Skeleton_Color = Color3.fromRGB(255, 255, 255)
+            ESPSettings.TeamCheck = true
+            ESPSettings.TeamColor = false
+
+        elseif Value == "Competitive" then
+            -- Competitive settings (maximum visibility)
+            ESPSettings.Boxes = true
+            ESPSettings.Tracers = true
+            ESPSettings.HealthBars = true
+            ESPSettings.Skeletons = true
+            ESPSettings.OffScreenArrows = true
+            ESPSettings.Names = true
+            ESPSettings.Distances = true
+            ESPSettings.Weapons = true
+            ESPSettings.Chams = true
+            ESPSettings.Box_Thickness = 2
+            ESPSettings.Tracer_Thickness = 2
+            ESPSettings.Skeleton_Thickness = 2
+            ESPSettings.Box_Color = Color3.fromRGB(0, 255, 0)
+            ESPSettings.Tracer_Color = Color3.fromRGB(0, 255, 0)
+            ESPSettings.Skeleton_Color = Color3.fromRGB(0, 255, 0)
+            ESPSettings.TeamCheck = true
+            ESPSettings.TeamColor = false
+
+        elseif Value == "Stealth" then
+            -- Stealth settings (minimal visibility, harder to detect)
+            ESPSettings.Boxes = false
+            ESPSettings.Tracers = false
+            ESPSettings.HealthBars = false
+            ESPSettings.Skeletons = false
+            ESPSettings.OffScreenArrows = true
+            ESPSettings.Names = false
+            ESPSettings.Distances = false
+            ESPSettings.Weapons = false
+            ESPSettings.Chams = false
+            ESPSettings.Box_Thickness = 1
+            ESPSettings.Tracer_Thickness = 1
+            ESPSettings.Skeleton_Thickness = 1
+            ESPSettings.Box_Color = Color3.fromRGB(255, 255, 255)
+            ESPSettings.Tracer_Color = Color3.fromRGB(255, 255, 255)
+            ESPSettings.Skeleton_Color = Color3.fromRGB(255, 255, 255)
+            ESPSettings.TeamCheck = true
+            ESPSettings.TeamColor = false
+
+        elseif Value == "Colorful" then
+            -- Colorful settings (rainbow colors)
+            ESPSettings.Boxes = true
+            ESPSettings.Tracers = true
+            ESPSettings.HealthBars = true
+            ESPSettings.Skeletons = true
+            ESPSettings.OffScreenArrows = true
+            ESPSettings.Names = true
+            ESPSettings.Distances = true
+            ESPSettings.Weapons = true
+            ESPSettings.Chams = true
+            ESPSettings.Box_Thickness = 2
+            ESPSettings.Tracer_Thickness = 2
+            ESPSettings.Skeleton_Thickness = 2
+            ESPSettings.RainbowColor = true
+            ESPSettings.RainbowOutlineColor = true
+            ESPSettings.TeamCheck = false
+            ESPSettings.TeamColor = true
+
+        elseif Value == "Minimal" then
+            -- Minimal settings (boxes only)
+            ESPSettings.Boxes = true
+            ESPSettings.Tracers = false
+            ESPSettings.HealthBars = false
+            ESPSettings.Skeletons = false
+            ESPSettings.OffScreenArrows = false
+            ESPSettings.Names = false
+            ESPSettings.Distances = false
+            ESPSettings.Weapons = false
+            ESPSettings.Chams = false
+            ESPSettings.Box_Thickness = 1
+            ESPSettings.Tracer_Thickness = 1
+            ESPSettings.Skeleton_Thickness = 1
+            ESPSettings.Box_Color = Color3.fromRGB(255, 255, 255)
+            ESPSettings.Tracer_Color = Color3.fromRGB(255, 255, 255)
+            ESPSettings.Skeleton_Color = Color3.fromRGB(255, 255, 255)
+            ESPSettings.TeamCheck = true
+            ESPSettings.TeamColor = false
+        end
+
+        -- Update UI elements to reflect the new settings
+        Toggles.ESPBoxes:SetValue(ESPSettings.Boxes)
+        Toggles.ESPTracers:SetValue(ESPSettings.Tracers)
+        Toggles.ESPHealthBars:SetValue(ESPSettings.HealthBars)
+        Toggles.ESPSkeletons:SetValue(ESPSettings.Skeletons)
+        Toggles.ESPOffScreenArrows:SetValue(ESPSettings.OffScreenArrows)
+        if Toggles.ESPNames then Toggles.ESPNames:SetValue(ESPSettings.Names) end
+        if Toggles.ESPDistances then Toggles.ESPDistances:SetValue(ESPSettings.Distances) end
+        if Toggles.ESPWeapons then Toggles.ESPWeapons:SetValue(ESPSettings.Weapons) end
+        if Toggles.ESPChams then Toggles.ESPChams:SetValue(ESPSettings.Chams) end
+
+        -- Initialize ESP with new settings
+        if ESPSettings.Enabled then
+            InitializeESP()
+        end
+
+        Library:Notify({
+            Title = "ESP Preset Applied",
+            Description = Value .. " preset has been applied",
+            Time = 2,
+        })
+    end,
+})
+
 ESPGroup:AddToggle("ESPBoxes", {
     Text = "Show Boxes",
     Default = ESPSettings.Boxes,
@@ -1416,6 +2247,112 @@ ESPGroup:AddToggle("ESPOffScreenArrows", {
                 if v.Name ~= player.Name and not OffScreenArrowObjects[v.Name] then
                     coroutine.wrap(DrawOffScreenArrows)(v)
                 end
+            end
+        end
+    end,
+})
+
+-- Add new ESP features
+ESPGroup:AddToggle("ESPNames", {
+    Text = "Show Names",
+    Default = ESPSettings.Names or false,
+    Disabled = not DrawingAvailable,
+    Callback = function(Value)
+        ESPSettings.Names = Value
+    end,
+})
+
+ESPGroup:AddToggle("ESPDistances", {
+    Text = "Show Distances",
+    Default = ESPSettings.Distances or false,
+    Disabled = not DrawingAvailable,
+    Callback = function(Value)
+        ESPSettings.Distances = Value
+    end,
+})
+
+ESPGroup:AddToggle("ESPWeapons", {
+    Text = "Show Weapons",
+    Default = ESPSettings.Weapons or false,
+    Disabled = not DrawingAvailable,
+    Callback = function(Value)
+        ESPSettings.Weapons = Value
+    end,
+})
+
+ESPGroup:AddToggle("ESPChams", {
+    Text = "Show Chams",
+    Default = ESPSettings.Chams or false,
+    Disabled = not DrawingAvailable,
+    Tooltip = "Highlight players through walls",
+    Callback = function(Value)
+        ESPSettings.Chams = Value
+
+        -- Initialize chams if enabled
+        if Value and DrawingAvailable then
+            if not getgenv().ChamsInitialized then
+                getgenv().ChamsInitialized = true
+
+                -- Create chams function
+                getgenv().UpdateChams = function()
+                    for _, plr in pairs(game:GetService("Players"):GetPlayers()) do
+                        if plr ~= player and plr.Character then
+                            -- Check if chams already exist for this player
+                            if not getgenv().ChamsObjects then getgenv().ChamsObjects = {} end
+
+                            if not getgenv().ChamsObjects[plr.Name] then
+                                getgenv().ChamsObjects[plr.Name] = {}
+
+                                -- Create highlight for the character
+                                local highlight = Instance.new("Highlight")
+                                highlight.FillColor = ESPSettings.TeamCheck and 
+                                    (plr.TeamColor == player.TeamColor and ESPSettings.Green or ESPSettings.Red) or 
+                                    (ESPSettings.TeamColor and plr.TeamColor.Color or Color3.fromRGB(255, 0, 0))
+                                highlight.OutlineColor = Color3.fromRGB(0, 0, 0)
+                                highlight.FillTransparency = 0.5
+                                highlight.OutlineTransparency = 0
+                                highlight.Adornee = plr.Character
+                                highlight.Parent = game:GetService("CoreGui")
+
+                                getgenv().ChamsObjects[plr.Name].Highlight = highlight
+                            else
+                                -- Update existing highlight
+                                local highlight = getgenv().ChamsObjects[plr.Name].Highlight
+                                if highlight and highlight.Parent then
+                                    highlight.FillColor = ESPSettings.TeamCheck and 
+                                        (plr.TeamColor == player.TeamColor and ESPSettings.Green or ESPSettings.Red) or 
+                                        (ESPSettings.TeamColor and plr.TeamColor.Color or Color3.fromRGB(255, 0, 0))
+                                    highlight.Adornee = plr.Character
+                                end
+                            end
+                        end
+                    end
+                end
+
+                -- Clean up chams function
+                getgenv().CleanupChams = function()
+                    if getgenv().ChamsObjects then
+                        for _, chamObj in pairs(getgenv().ChamsObjects) do
+                            if chamObj.Highlight and chamObj.Highlight.Parent then
+                                chamObj.Highlight:Destroy()
+                            end
+                        end
+                        getgenv().ChamsObjects = {}
+                    end
+                end
+
+                -- Run update chams
+                getgenv().UpdateChams()
+            else
+                -- If already initialized, just update
+                if getgenv().UpdateChams then
+                    getgenv().UpdateChams()
+                end
+            end
+        else
+            -- Clean up chams if disabled
+            if getgenv().CleanupChams then
+                getgenv().CleanupChams()
             end
         end
     end,
