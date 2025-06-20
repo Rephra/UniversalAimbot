@@ -34,6 +34,7 @@ local Tabs = {
     ESP = Window:AddTab("ESP", "eye"),
     Players = Window:AddTab("Players", "users"),
     Sweat = Window:AddTab("Sweat", "droplet"),
+    Movement = Window:AddTab("Movement", "move"),
     ["UI Settings"] = Window:AddTab("UI Settings", "settings"),
 }
 
@@ -3410,6 +3411,563 @@ SweatAdvancedGroup:AddSlider("FOVValue", {
         -- Only update FOV if FOV Changer is enabled
         if Toggles.FOVChanger and Toggles.FOVChanger.Value then
             workspace.Camera.FieldOfView = Value
+        end
+    end,
+})
+
+-- Movement Tab
+local MovementGroup = Tabs.Movement:AddLeftGroupbox("Movement Features")
+local MovementAdvancedGroup = Tabs.Movement:AddRightGroupbox("Advanced Movement")
+
+-- Variables for CFrame Fly
+local CFspeed = 50
+local CFloop = nil
+
+-- CFrame Fly Toggle
+MovementGroup:AddToggle("CFlyEnabled", {
+    Text = "CFrame Fly",
+    Default = false,
+    Tooltip = "Enables CFrame flying (bypasses some anti-cheats)",
+    Callback = function(Value)
+        if Value then
+            -- Enable CFrame Fly
+            local player = game.Players.LocalPlayer
+            player.Character:FindFirstChildOfClass('Humanoid').PlatformStand = true
+            local Head = player.Character:WaitForChild("Head")
+            Head.Anchored = true
+
+            if CFloop then CFloop:Disconnect() end
+
+            CFloop = game:GetService("RunService").Heartbeat:Connect(function(deltaTime)
+                local moveDirection = player.Character:FindFirstChildOfClass('Humanoid').MoveDirection * (CFspeed * deltaTime)
+                local headCFrame = Head.CFrame
+                local cameraCFrame = workspace.CurrentCamera.CFrame
+                local cameraOffset = headCFrame:ToObjectSpace(cameraCFrame).Position
+                cameraCFrame = cameraCFrame * CFrame.new(-cameraOffset.X, -cameraOffset.Y, -cameraOffset.Z + 1)
+                local cameraPosition = cameraCFrame.Position
+                local headPosition = headCFrame.Position
+
+                local objectSpaceVelocity = CFrame.new(cameraPosition, Vector3.new(headPosition.X, cameraPosition.Y, headPosition.Z)):VectorToObjectSpace(moveDirection)
+                Head.CFrame = CFrame.new(headPosition) * (cameraCFrame - cameraPosition) * CFrame.new(objectSpaceVelocity)
+            end)
+
+            Library:Notify({
+                Title = "CFrame Fly Enabled",
+                Description = "CFrame flying is now active",
+                Time = 2,
+            })
+        else
+            -- Disable CFrame Fly
+            if CFloop then
+                CFloop:Disconnect()
+                local player = game.Players.LocalPlayer
+                player.Character:FindFirstChildOfClass('Humanoid').PlatformStand = false
+                local Head = player.Character:WaitForChild("Head")
+                Head.Anchored = false
+
+                Library:Notify({
+                    Title = "CFrame Fly Disabled",
+                    Description = "CFrame flying is now inactive",
+                    Time = 2,
+                })
+            end
+        end
+    end,
+})
+
+-- CFrame Fly Speed Slider
+MovementGroup:AddSlider("CFlySpeed", {
+    Text = "CFrame Fly Speed",
+    Default = 50,
+    Min = 10,
+    Max = 200,
+    Rounding = 0,
+    Callback = function(Value)
+        CFspeed = Value
+    end,
+})
+
+-- WalkSpeed Feature
+local WalkSpeedValue = 16
+local WalkSpeedLoop = nil
+local WalkSpeedCA = nil
+
+MovementGroup:AddToggle("WalkSpeedEnabled", {
+    Text = "Enable WalkSpeed",
+    Default = false,
+    Tooltip = "Changes your character's movement speed",
+    Callback = function(Value)
+        local player = game.Players.LocalPlayer
+        if Value then
+            -- Set walkspeed
+            if player.Character and player.Character:FindFirstChildOfClass('Humanoid') then
+                player.Character:FindFirstChildOfClass('Humanoid').WalkSpeed = WalkSpeedValue
+            end
+
+            Library:Notify({
+                Title = "WalkSpeed Enabled",
+                Description = "WalkSpeed set to " .. WalkSpeedValue,
+                Time = 2,
+            })
+        else
+            -- Reset walkspeed to default
+            if player.Character and player.Character:FindFirstChildOfClass('Humanoid') then
+                player.Character:FindFirstChildOfClass('Humanoid').WalkSpeed = 16
+            end
+
+            -- Disconnect loop if it exists
+            if WalkSpeedLoop then
+                WalkSpeedLoop:Disconnect()
+                WalkSpeedLoop = nil
+            end
+
+            if WalkSpeedCA then
+                WalkSpeedCA:Disconnect()
+                WalkSpeedCA = nil
+            end
+
+            Library:Notify({
+                Title = "WalkSpeed Disabled",
+                Description = "WalkSpeed reset to default",
+                Time = 2,
+            })
+        end
+    end,
+})
+
+MovementGroup:AddSlider("WalkSpeedValue", {
+    Text = "WalkSpeed Value",
+    Default = 16,
+    Min = 16,
+    Max = 200,
+    Rounding = 0,
+    Callback = function(Value)
+        WalkSpeedValue = Value
+
+        -- Update walkspeed if enabled
+        if Toggles.WalkSpeedEnabled and Toggles.WalkSpeedEnabled.Value then
+            local player = game.Players.LocalPlayer
+            if player.Character and player.Character:FindFirstChildOfClass('Humanoid') then
+                player.Character:FindFirstChildOfClass('Humanoid').WalkSpeed = Value
+            end
+        end
+    end,
+})
+
+MovementGroup:AddToggle("LoopWalkSpeed", {
+    Text = "Loop WalkSpeed",
+    Default = false,
+    Tooltip = "Continuously sets your walkspeed (prevents games from changing it back)",
+    Callback = function(Value)
+        local player = game.Players.LocalPlayer
+
+        if Value then
+            -- Function to set walkspeed
+            local function UpdateWalkSpeed()
+                if player.Character and player.Character:FindFirstChildOfClass('Humanoid') then
+                    player.Character:FindFirstChildOfClass('Humanoid').WalkSpeed = WalkSpeedValue
+                end
+            end
+
+            -- Initial set
+            UpdateWalkSpeed()
+
+            -- Connect to property changed signal
+            local Human = player.Character and player.Character:FindFirstChildOfClass('Humanoid')
+            if Human then
+                WalkSpeedLoop = Human:GetPropertyChangedSignal("WalkSpeed"):Connect(UpdateWalkSpeed)
+            end
+
+            -- Connect to character added
+            WalkSpeedCA = player.CharacterAdded:Connect(function(newChar)
+                local newHuman = newChar:WaitForChild("Humanoid")
+                UpdateWalkSpeed()
+
+                if WalkSpeedLoop then
+                    WalkSpeedLoop:Disconnect()
+                end
+
+                WalkSpeedLoop = newHuman:GetPropertyChangedSignal("WalkSpeed"):Connect(UpdateWalkSpeed)
+            end)
+
+            Library:Notify({
+                Title = "Loop WalkSpeed Enabled",
+                Description = "Your walkspeed will be maintained at " .. WalkSpeedValue,
+                Time = 2,
+            })
+        else
+            -- Disconnect loop
+            if WalkSpeedLoop then
+                WalkSpeedLoop:Disconnect()
+                WalkSpeedLoop = nil
+            end
+
+            if WalkSpeedCA then
+                WalkSpeedCA:Disconnect()
+                WalkSpeedCA = nil
+            end
+
+            Library:Notify({
+                Title = "Loop WalkSpeed Disabled",
+                Description = "WalkSpeed loop stopped",
+                Time = 2,
+            })
+        end
+    end,
+})
+
+-- Jump Power Feature
+local JumpPowerValue = 50
+local JumpPowerLoop = nil
+local JumpPowerCA = nil
+
+MovementGroup:AddToggle("JumpPowerEnabled", {
+    Text = "Enable Jump Power",
+    Default = false,
+    Tooltip = "Changes how high your character can jump",
+    Callback = function(Value)
+        local player = game.Players.LocalPlayer
+        if Value then
+            -- Set jump power
+            if player.Character and player.Character:FindFirstChildOfClass('Humanoid') then
+                if player.Character:FindFirstChildOfClass('Humanoid').UseJumpPower then
+                    player.Character:FindFirstChildOfClass('Humanoid').JumpPower = JumpPowerValue
+                else
+                    player.Character:FindFirstChildOfClass('Humanoid').JumpHeight = JumpPowerValue / 2.5
+                end
+            end
+
+            Library:Notify({
+                Title = "Jump Power Enabled",
+                Description = "Jump Power set to " .. JumpPowerValue,
+                Time = 2,
+            })
+        else
+            -- Reset jump power to default
+            if player.Character and player.Character:FindFirstChildOfClass('Humanoid') then
+                if player.Character:FindFirstChildOfClass('Humanoid').UseJumpPower then
+                    player.Character:FindFirstChildOfClass('Humanoid').JumpPower = 50
+                else
+                    player.Character:FindFirstChildOfClass('Humanoid').JumpHeight = 7.2
+                end
+            end
+
+            -- Disconnect loop if it exists
+            if JumpPowerLoop then
+                JumpPowerLoop:Disconnect()
+                JumpPowerLoop = nil
+            end
+
+            if JumpPowerCA then
+                JumpPowerCA:Disconnect()
+                JumpPowerCA = nil
+            end
+
+            Library:Notify({
+                Title = "Jump Power Disabled",
+                Description = "Jump Power reset to default",
+                Time = 2,
+            })
+        end
+    end,
+})
+
+MovementGroup:AddSlider("JumpPowerValue", {
+    Text = "Jump Power Value",
+    Default = 50,
+    Min = 50,
+    Max = 300,
+    Rounding = 0,
+    Callback = function(Value)
+        JumpPowerValue = Value
+
+        -- Update jump power if enabled
+        if Toggles.JumpPowerEnabled and Toggles.JumpPowerEnabled.Value then
+            local player = game.Players.LocalPlayer
+            if player.Character and player.Character:FindFirstChildOfClass('Humanoid') then
+                if player.Character:FindFirstChildOfClass('Humanoid').UseJumpPower then
+                    player.Character:FindFirstChildOfClass('Humanoid').JumpPower = Value
+                else
+                    player.Character:FindFirstChildOfClass('Humanoid').JumpHeight = Value / 2.5
+                end
+            end
+        end
+    end,
+})
+
+MovementGroup:AddToggle("LoopJumpPower", {
+    Text = "Loop Jump Power",
+    Default = false,
+    Tooltip = "Continuously sets your jump power (prevents games from changing it back)",
+    Callback = function(Value)
+        local player = game.Players.LocalPlayer
+
+        if Value then
+            -- Function to set jump power
+            local function UpdateJumpPower()
+                if player.Character and player.Character:FindFirstChildOfClass('Humanoid') then
+                    if player.Character:FindFirstChildOfClass('Humanoid').UseJumpPower then
+                        player.Character:FindFirstChildOfClass('Humanoid').JumpPower = JumpPowerValue
+                    else
+                        player.Character:FindFirstChildOfClass('Humanoid').JumpHeight = JumpPowerValue / 2.5
+                    end
+                end
+            end
+
+            -- Initial set
+            UpdateJumpPower()
+
+            -- Connect to property changed signal
+            local Human = player.Character and player.Character:FindFirstChildOfClass('Humanoid')
+            if Human then
+                if Human.UseJumpPower then
+                    JumpPowerLoop = Human:GetPropertyChangedSignal("JumpPower"):Connect(UpdateJumpPower)
+                else
+                    JumpPowerLoop = Human:GetPropertyChangedSignal("JumpHeight"):Connect(UpdateJumpPower)
+                end
+            end
+
+            -- Connect to character added
+            JumpPowerCA = player.CharacterAdded:Connect(function(newChar)
+                local newHuman = newChar:WaitForChild("Humanoid")
+                UpdateJumpPower()
+
+                if JumpPowerLoop then
+                    JumpPowerLoop:Disconnect()
+                end
+
+                if newHuman.UseJumpPower then
+                    JumpPowerLoop = newHuman:GetPropertyChangedSignal("JumpPower"):Connect(UpdateJumpPower)
+                else
+                    JumpPowerLoop = newHuman:GetPropertyChangedSignal("JumpHeight"):Connect(UpdateJumpPower)
+                end
+            end)
+
+            Library:Notify({
+                Title = "Loop Jump Power Enabled",
+                Description = "Your jump power will be maintained at " .. JumpPowerValue,
+                Time = 2,
+            })
+        else
+            -- Disconnect loop
+            if JumpPowerLoop then
+                JumpPowerLoop:Disconnect()
+                JumpPowerLoop = nil
+            end
+
+            if JumpPowerCA then
+                JumpPowerCA:Disconnect()
+                JumpPowerCA = nil
+            end
+
+            Library:Notify({
+                Title = "Loop Jump Power Disabled",
+                Description = "Jump Power loop stopped",
+                Time = 2,
+            })
+        end
+    end,
+})
+
+-- Float Feature
+local Floating = false
+local floatName = "FloatPart_" .. math.random(1000, 9999)
+local FloatingFunc = nil
+local qUp, eUp, qDown, eDown, floatDied = nil, nil, nil, nil, nil
+
+MovementGroup:AddToggle("FloatEnabled", {
+    Text = "Float/Platform",
+    Default = false,
+    Tooltip = "Creates an invisible platform under you (Q = down, E = up)",
+    Callback = function(Value)
+        Floating = Value
+        local player = game.Players.LocalPlayer
+        local pchar = player.Character
+
+        if Value then
+            if pchar and not pchar:FindFirstChild(floatName) then
+                task.spawn(function()
+                    local Float = Instance.new('Part')
+                    Float.Name = floatName
+                    Float.Parent = pchar
+                    Float.Transparency = 1
+                    Float.Size = Vector3.new(2, 0.2, 1.5)
+                    Float.Anchored = true
+                    local FloatValue = -3.1
+
+                    local function getRoot(char)
+                        return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+                    end
+
+                    Float.CFrame = getRoot(pchar).CFrame * CFrame.new(0, FloatValue, 0)
+
+                    Library:Notify({
+                        Title = "Float Enabled",
+                        Description = "Float platform active (Q = down & E = up)",
+                        Time = 2,
+                    })
+
+                    qUp = game:GetService("UserInputService").InputEnded:Connect(function(input)
+                        if input.KeyCode == Enum.KeyCode.Q then
+                            FloatValue = FloatValue + 0.5
+                        end
+                    end)
+
+                    eUp = game:GetService("UserInputService").InputEnded:Connect(function(input)
+                        if input.KeyCode == Enum.KeyCode.E then
+                            FloatValue = FloatValue - 1.5
+                        end
+                    end)
+
+                    qDown = game:GetService("UserInputService").InputBegan:Connect(function(input)
+                        if input.KeyCode == Enum.KeyCode.Q then
+                            FloatValue = FloatValue - 0.5
+                        end
+                    end)
+
+                    eDown = game:GetService("UserInputService").InputBegan:Connect(function(input)
+                        if input.KeyCode == Enum.KeyCode.E then
+                            FloatValue = FloatValue + 1.5
+                        end
+                    end)
+
+                    floatDied = pchar:FindFirstChildOfClass('Humanoid').Died:Connect(function()
+                        if FloatingFunc then FloatingFunc:Disconnect() end
+                        Float:Destroy()
+                        if qUp then qUp:Disconnect() end
+                        if eUp then eUp:Disconnect() end
+                        if qDown then qDown:Disconnect() end
+                        if eDown then eDown:Disconnect() end
+                        if floatDied then floatDied:Disconnect() end
+                    end)
+
+                    local function FloatPadLoop()
+                        if pchar:FindFirstChild(floatName) and getRoot(pchar) then
+                            Float.CFrame = getRoot(pchar).CFrame * CFrame.new(0, FloatValue, 0)
+                        else
+                            if FloatingFunc then FloatingFunc:Disconnect() end
+                            Float:Destroy()
+                            if qUp then qUp:Disconnect() end
+                            if eUp then eUp:Disconnect() end
+                            if qDown then qDown:Disconnect() end
+                            if eDown then eDown:Disconnect() end
+                            if floatDied then floatDied:Disconnect() end
+                        end
+                    end
+
+                    FloatingFunc = game:GetService("RunService").Heartbeat:Connect(FloatPadLoop)
+                end)
+            end
+        else
+            Library:Notify({
+                Title = "Float Disabled",
+                Description = "Float platform removed",
+                Time = 2,
+            })
+
+            if pchar:FindFirstChild(floatName) then
+                pchar:FindFirstChild(floatName):Destroy()
+            end
+
+            if FloatingFunc then FloatingFunc:Disconnect() end
+            if qUp then qUp:Disconnect() end
+            if eUp then eUp:Disconnect() end
+            if qDown then qDown:Disconnect() end
+            if eDown then eDown:Disconnect() end
+            if floatDied then floatDied:Disconnect() end
+        end
+    end,
+})
+
+-- NoClip Feature
+local Clip = true
+local Noclipping = nil
+
+MovementAdvancedGroup:AddToggle("NoClipEnabled", {
+    Text = "NoClip",
+    Default = false,
+    Tooltip = "Allows you to walk through walls and objects",
+    Callback = function(Value)
+        local player = game.Players.LocalPlayer
+
+        if Value then
+            -- Enable NoClip
+            Clip = false
+
+            local function NoclipLoop()
+                if Clip == false and player.Character ~= nil then
+                    for _, child in pairs(player.Character:GetDescendants()) do
+                        if child:IsA("BasePart") and child.CanCollide == true and child.Name ~= floatName then
+                            child.CanCollide = false
+                        end
+                    end
+                end
+            end
+
+            Noclipping = game:GetService("RunService").Stepped:Connect(NoclipLoop)
+
+            Library:Notify({
+                Title = "NoClip Enabled",
+                Description = "You can now walk through objects",
+                Time = 2,
+            })
+        else
+            -- Disable NoClip
+            if Noclipping then
+                Noclipping:Disconnect()
+                Noclipping = nil
+            end
+
+            Clip = true
+
+            Library:Notify({
+                Title = "NoClip Disabled",
+                Description = "NoClip is now inactive",
+                Time = 2,
+            })
+        end
+    end,
+})
+
+-- Infinite Jump Feature
+local InfiniteJump = false
+local InfiniteJumpConnection = nil
+
+MovementAdvancedGroup:AddToggle("InfiniteJumpEnabled", {
+    Text = "Infinite Jump",
+    Default = false,
+    Tooltip = "Allows you to jump infinitely without waiting for cooldown",
+    Callback = function(Value)
+        InfiniteJump = Value
+
+        if Value then
+            -- Enable Infinite Jump
+            InfiniteJumpConnection = game:GetService("UserInputService").JumpRequest:Connect(function()
+                if InfiniteJump then
+                    local player = game.Players.LocalPlayer
+                    if player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+                        player.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
+                    end
+                end
+            end)
+
+            Library:Notify({
+                Title = "Infinite Jump Enabled",
+                Description = "You can now jump infinitely",
+                Time = 2,
+            })
+        else
+            -- Disable Infinite Jump
+            if InfiniteJumpConnection then
+                InfiniteJumpConnection:Disconnect()
+                InfiniteJumpConnection = nil
+            end
+
+            Library:Notify({
+                Title = "Infinite Jump Disabled",
+                Description = "Infinite Jump is now inactive",
+                Time = 2,
+            })
         end
     end,
 })
